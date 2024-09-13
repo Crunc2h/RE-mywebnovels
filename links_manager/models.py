@@ -1,0 +1,101 @@
+import os
+from datetime import datetime, timezone
+from django.db import models
+from django.db.models import Q
+
+WEBSITES_DIR_NAME = "websites"
+NOVEL_LINKS_PAGES_DIR_NAME = "novel_links_pages"
+NOVEL_PAGES_DIR_NAME = "novel_pages"
+NOVELS_DIR_NAME = "novels"
+NOVEL_UPDATE_THRESHOLD_MINUTES = 720
+
+
+class Website(models.Model):
+    name = models.CharField(max_length=128)
+    link = models.CharField(max_length=8096)
+    crawler_start_link = models.CharField(max_length=8096)
+    website_directory = models.CharField(max_length=8096, blank=True, null=True)
+    novel_link_pages_directory = models.CharField(
+        max_length=8096, blank=True, null=True
+    )
+    novel_pages_directory = models.CharField(max_length=8096, blank=True, null=True)
+    novels_directory = models.CharField(max_length=8096, blank=True, null=True)
+
+    def save(self):
+        self.website_directory = (
+            os.path.dirname(os.path.realpath(__file__)) + "/"
+            "websites" + "/" + self.name
+        )
+        if not os.path.exists(self.website_directory):
+            os.makedirs(self.website_directory)
+
+        self.novel_link_pages_directory = (
+            self.website_directory + "/" + NOVEL_LINKS_PAGES_DIR_NAME
+        )
+        if not os.path.exists(self.novel_link_pages_directory):
+            os.makedirs(self.novel_link_pages_directory)
+
+        self.novel_pages_directory = self.website_directory + "/" + NOVEL_PAGES_DIR_NAME
+        if not os.path.exists(self.novel_pages_directory):
+            os.makedirs(self.novel_pages_directory)
+
+        self.novels_directory = self.website_directory + "/" + "novels"
+        if not os.path.exists(self.novels_directory):
+            os.makedirs(self.novels_directory)
+
+        return super().save()
+
+    def novel_link_exists(self, novel_link):
+        return novel_link in [novel_link.link for novel_link in self.novel_links.all()]
+
+    def novel_exists(self, novel_name):
+        existing_novels = [
+            novel_link.novel.name for novel_link in self.novel_links.all()
+        ]
+        return novel_name.lower() in existing_novels
+
+
+class NovelLink(models.Model):
+    website = models.ForeignKey(
+        Website, on_delete=models.CASCADE, related_name="novel_links"
+    )
+    link = models.CharField(max_length=8096)
+    initialized = models.BooleanField(default=False)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def save(self):
+        """self.directory = self.website.website_directory + NOVEL_LINKS_FILE
+        if not os.path.exists(self.directory):
+            with open(self.directory, "w") as file:
+                file.write("")"""
+        return super().save()
+
+    def chapter_link_exists(self, chapter_link):
+        return chapter_link in [
+            chapter_link.link for chapter_link in self.chapter_links.all()
+        ]
+
+    def get_uninitialized_chapter_links(self):
+        return self.chapter_links.filter(initialized=False)
+
+    def is_updatable(self):
+        if not self.initialized:
+            return True
+        return (
+            datetime.now(timezone.utc) - self.last_updated
+        ).seconds // 60 >= NOVEL_UPDATE_THRESHOLD_MINUTES
+
+
+class ChapterLink(models.Model):
+    novel_link = models.ForeignKey(
+        NovelLink, on_delete=models.CASCADE, related_name="chapter_links"
+    )
+    link = models.CharField(max_length=8096)
+    initialized = models.BooleanField(default=False)
+
+
+def db_novel_exists(novel_name, website_name):
+    for website in Website.objects.filter(~Q(name=website_name)):
+        if website.novel_exists(novel_name):
+            return True
+    return False
