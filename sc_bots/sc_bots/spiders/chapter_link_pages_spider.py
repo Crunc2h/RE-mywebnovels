@@ -4,6 +4,7 @@ from fake_useragent import UserAgent
 
 UA = UserAgent()
 FILE_FORMAT = "html"
+CHAPTER_LINK_PAGES_FORMAT = "/chapter_links_page-{current_page}.{file_format}"
 
 
 class ChapterLinkPagesSpider(scrapy.Spider):
@@ -39,7 +40,9 @@ class ChapterLinkPagesSpider(scrapy.Spider):
 
         Path(
             self.chapter_link_pages_directory
-            + f"/chapter_links_page-{self.current_page}.{FILE_FORMAT}"
+            + CHAPTER_LINK_PAGES_FORMAT.format(
+                current_page=self.current_page, file_format=FILE_FORMAT
+            )
         ).write_bytes(response.body)
 
         next_page = self.get_next_page(response)

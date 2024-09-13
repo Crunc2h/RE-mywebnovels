@@ -20,7 +20,6 @@ class Website(models.Model):
     novel_link_pages_directory = models.CharField(
         max_length=8096, blank=True, null=True
     )
-    novel_pages_directory = models.CharField(max_length=2048, blank=True, null=True)
     novels_directory = models.CharField(max_length=2048, blank=True, null=True)
 
     def save(self):
@@ -37,10 +36,6 @@ class Website(models.Model):
         if not os.path.exists(self.novel_link_pages_directory):
             os.makedirs(self.novel_link_pages_directory)
 
-        self.novel_pages_directory = self.website_directory + "/" + NOVEL_PAGES_DIR_NAME
-        if not os.path.exists(self.novel_pages_directory):
-            os.makedirs(self.novel_pages_directory)
-
         self.novels_directory = self.website_directory + "/" + "novels"
         if not os.path.exists(self.novels_directory):
             os.makedirs(self.novels_directory)
@@ -50,11 +45,19 @@ class Website(models.Model):
     def novel_link_exists(self, novel_link):
         return novel_link in [novel_link.link for novel_link in self.novel_links.all()]
 
-    def novel_exists(self, novel_name):
+    def novel_exists_normal_name(self, novel_normal_name):
         existing_novels = [
-            novel_link.novel.name for novel_link in self.novel_links.all()
+            novel_link.novel.name
+            for novel_link in self.novel_links.all()
+            if novel_link.initialized
         ]
-        return novel_name.lower() in existing_novels
+        return novel_normal_name.lower() in existing_novels
+
+    def novel_exists_slug_name(self, novel_slug_name):
+        existing_novels = [
+            novel_link.slug_name for novel_link in self.novel_links.all()
+        ]
+        return novel_slug_name.lower() in existing_novels
 
 
 class NovelLink(models.Model):
@@ -85,8 +88,10 @@ class NovelLink(models.Model):
         self.chapter_pages_directory = (
             self.novel_directory + "/" + CHAPTER_PAGES_DIR_NAME
         )
-        if not os.path.exists(self.directory):
+        if not os.path.exists(self.chapter_link_pages_directory):
             os.makedirs(self.chapter_pages_directory)
+
+        self.slug_name = self.slug_name.lower()
 
         return super().save()
 
@@ -120,8 +125,10 @@ class ChapterLink(models.Model):
     initialized = models.BooleanField(default=False)
 
 
-def db_novel_exists(novel_name, website_name):
-    for website in Website.objects.filter(~Q(name=website_name)):
-        if website.novel_exists(novel_name):
+def db_novel_exists(novel_normal_name, novel_slug_name):
+    for website in Website.objects.all():
+        if website.novel_exists_normal_name(
+            novel_normal_name
+        ) or website.novel_exists_slug_name(novel_slug_name):
             return True
     return False
