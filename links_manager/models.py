@@ -121,8 +121,9 @@ class ChapterLink(models.Model):
     novel_link = models.ForeignKey(
         NovelLink, on_delete=models.CASCADE, related_name="chapter_links"
     )
-    link = models.CharField(max_length=8096)
     initialized = models.BooleanField(default=False)
+    link = models.CharField(max_length=8096)
+    name = models.CharField(max_length=1024)
 
 
 def db_novel_exists(novel_normal_name):

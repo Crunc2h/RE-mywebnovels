@@ -106,11 +106,15 @@ def get_chapters_index_page(response):
 
 
 def get_novel_slug_name(url):
-    return url.split("novel/")[1].lower()
+    return standardize_str(url.split("novel/")[1])
 
 
 def get_novel_name_from_slug(slug_name):
-    return " ".join(slug_name.split("-")).lower()
+    return standardize_str(" ".join(slug_name.split("-")))
+
+
+def standardize_str(s):
+    return s.strip().strip("\n").lower()
 
 
 def get_novel_links(novel_link_pages_dir, crawler_start_link):
@@ -200,132 +204,149 @@ def start_website_update(website_name, max_allowed_processes):
     )
 
 
-def process_novel_link_pages(website_object, website_update_instance):
-    novel_link_pages = os.listdir(website_object.novel_link_pages_directory)
+def process_novel_link_pages(website_object, get_novel_slug_name, unverified_pages=[]):
+    if len(unverified_pages) > 0:
+        novel_link_pages = unverified_pages
+    else:
+        novel_link_pages = os.listdir(website_object.novel_link_pages_directory)
+
+    new_novel_links = []
+    unverified_pages = []
+
     for novel_link_page in novel_link_pages:
-        with open(
-            website_object.novel_link_pages_directory + "/" + novel_link_page, "r"
-        ) as file:
+        file_path = website_object.novel_link_pages_directory + "/" + novel_link_page
+        with open(file_path, "r") as file:
             soup = BeautifulSoup(file, "lxml")
-            novel_links = [
-                website_object.link + novel_item.find("a")["href"]
-                for novel_item in soup.find_all(class_="novel-item")
-            ]
-            for link in novel_links:
-
-                if not website_object.novel_link_exists(link):
-                    novel_slug_name = get_novel_slug_name(link)
-                    if not website_update_instance.novel_exists_slug_name(
-                        novel_slug_name=novel_slug_name,
-                    ):
-                        new_link = lm_models.NovelLink(
-                            website=website_object, link=link, slug_name=novel_slug_name
+            for novel_item in soup.find_all(class_="novel-item"):
+                link_element = website_object.link + novel_item.find("a")
+                if link_element != None:
+                    new_novel_links.append(
+                        lm_models.NovelLink(
+                            webite=website_object,
+                            link=link_element["href"],
+                            slug_name=get_novel_slug_name(link_element["href"]),
                         )
-                        new_link.save()
+                    )
+                else:
+                    if file_path not in unverified_pages:
+                        unverified_pages.append(file_path)
+    return new_novel_links, unverified_pages
 
-                        website_update_instance.new_novel_links_added += 1
-                        website_update_instance.save()
 
+def process_chapter_link_pages(novel_link_object, unverified_pages=[]):
+    if len(unverified_pages) > 0:
+        chapter_link_pages = unverified_pages
+    else:
+        chapter_link_pages = os.listdir(novel_link_object.chapter_link_pages_directory)
 
-def process_chapter_link_pages(novel_link_object, website_update_instance):
-    chapter_link_pages = os.listdir(novel_link_object.chapter_link_pages_directory)
+    new_chapter_links = []
+    unverified_pages = []
+
     for chapter_link_page in chapter_link_pages:
-        with open(
-            novel_link_object.chapter_link_pages_directory + "/" + chapter_link_page,
-            "r",
-        ) as file:
+        file_path = (
+            novel_link_object.chapter_link_pages_directory + "/" + chapter_link_page
+        )
+        with open(file_path, "r") as file:
             soup = BeautifulSoup(file, "lxml")
             chapter_list = soup.select_one(".chapter-list")
-            chapter_links = [
-                "https://"
-                + website_update_instance.website.link
-                + chapter_item.find("a")["href"]
-                for chapter_item in chapter_list.find_all("li")
-            ]
-            for link in chapter_links:
-                if not novel_link_object.chapter_link_exists(link):
-                    new_link = lm_models.ChapterLink(
-                        novel_link=novel_link_object, link=link
+            for chapter_item in chapter_list.find_all("li"):
+                link_element = novel_link_object.website.link + chapter_item.find("a")
+                name_element = chapter_item.find(class_="chapter-title")
+                if link_element != None and name_element != None:
+                    new_chapter_links.append(
+                        lm_models.ChapterLink(
+                            novel_link=novel_link_object,
+                            name=standardize_str(name_element.text),
+                            link=link_element["href"],
+                        )
                     )
-                    novel_link_object.last_updated = datetime.now(timezone.utc)
-                    website_update_instance.new_novel_links_added += 1
-
-                    new_link.save()
-                    novel_link_object.save()
-                    website_update_instance.save()
+                else:
+                    if file_path not in unverified_pages:
+                        unverified_pages.append(file_path)
+    return new_chapter_links, unverified_pages
 
 
-def process_chapter_pages(novel_link_object, website_update_instance):
-    chapter_pages = os.listdir(novel_link_object.chapter_pages_directory)
-    chapter_urls = novel_link_object.get_uninitialized_chapter_links()
-    for i in range(0, len(chapter_urls)):
-        with open(
-            novel_link_object.chapter_pages_directory + "/" + chapter_pages[i],
-            "r",
-        ) as file:
+def process_chapter_pages(novel_link_object, unverified_pages=[]):
+    if len(unverified_pages) > 0:
+        chapter_pages = unverified_pages
+    else:
+        chapter_pages = os.listdir(novel_link_object.chapter_pages_directory)
+
+    new_chapters = []
+    unverified_pages = []
+
+    for chapter_page in chapter_pages:
+        file_path = novel_link_object.chapter_pages_directory + "/" + chapter_page
+        with open(file_path, "r") as file:
             soup = BeautifulSoup(file, "lxml")
-            link = chapter_urls[i]
-            matching_chapter_link_object = lm_models.ChapterLink.objects.get(link=link)
-            if (
-                novel_link_object.chapter_link_exists(link)
-                and not matching_chapter_link_object.initialized
-            ):
-                name = soup.select_one(".chapter-title").text
-                number = name.split("Chapter ")[1].split(":")[0]
+            name_element = soup.select_one(".chapter-title")
+            if name_element != None:
+                name = standardize_str(name_element)
+                matching_chapter_link_object = lm_models.ChapterLink.objects.get(
+                    name_element
+                )
+            else:
+                unverified_pages.append(file_path)
+                continue
+
+            date_published_element = soup.select_one(".titles > meta:nth-child(1)")
+            chapter_container_element = soup.find(id="chapter-container")
+
+            if date_published_element != None and chapter_container_element != None:
+                number = standardize_str(name.split("Chapter ")[1].split(":")[0])
                 date_published = datetime.strptime(
-                    soup.select_one(".titles > meta:nth-child(1)")["content"],
+                    date_published_element["content"],
                     "%Y-%m-%dT%H:%M:%S",
                 )
                 chapter_text = "\n".join(
                     [
                         paragraph_element.text
-                        for paragraph_element in soup.find(
-                            id="chapter-container"
-                        ).find_all("p")
+                        for paragraph_element in chapter_container_element.find_all("p")
                     ]
                 )
-                new_chapter = ns_models.Chapter(
-                    name=name,
-                    number=number,
-                    link=matching_chapter_link_object,
-                    date_published=date_published,
-                    novel=novel_link_object.novel,
-                    text=chapter_text,
+                new_chapters.append(
+                    ns_models.Chapter(
+                        name=name,
+                        number=number,
+                        link=matching_chapter_link_object,
+                        date_published=date_published,
+                        novel=novel_link_object.novel,
+                        text=chapter_text,
+                    )
                 )
-                novel_link_object.last_updated = datetime.now(timezone.utc)
-                matching_chapter_link_object.initialized = True
-                website_update_instance.new_chapter_links_added += 1
-
-                new_chapter.save()
-                novel_link_object.save()
-                matching_chapter_link_object.save()
-                website_update_instance.save()
-
-
-def process_novel_page(novel_link_object, website_update_instance):
-    with open(
-        novel_link_object.novel_directory
-        + NOVEL_PAGE_FORMAT.format(file_format=FILE_FORMAT),
-        "r",
-    ) as file:
-        soup = BeautifulSoup(file, "lxml")
-        name = soup.select_one(".novel-title").text
-        print(novel_link_object.slug_name)
-        if not lm_models.db_novel_exists(
-            novel_normal_name=name.lower(),
-        ):
-            completion_status = soup.select_one(".completed")
-            if not completion_status:
-                completion_status = soup.select_one(".ongoing").text
             else:
-                completion_status = completion_status.text
-            completion_status = ns_models.get_or_create_enum_model_from_str(
-                completion_status, ns_models.NovelCompletionStatus
-            )
+                unverified_pages.append(file_path)
+    return new_chapters, unverified_pages
+
+
+def process_novel_page(novel_link_object):
+    file_path = novel_link_object.novel_directory + NOVEL_PAGE_FORMAT.format(
+        file_format=FILE_FORMAT
+    )
+    with open(file_path, "r") as file:
+        soup = BeautifulSoup(file, "lxml")
+        name_element = soup.select_one(".novel-title")
+        author_element = soup.select_one(
+            ".header-stats > span:nth-child(1) > strong:nth-child(1) > i:nth-child(1)"
+        )
+        summary_element = soup.select_one("div.content")
+        completion_status_element = soup.select_one(".completed")
+        if completion_status_element is None:
+            completion_status_element = soup.select_one(".ongoing")
+        categories_element = soup.select_one(".categories")
+        tags_element = soup.select_one(".tags")
+
+        if (
+            name_element
+            and author_element
+            and summary_element
+            and completion_status_element
+            and categories_element
+            and tags_element
+        ):
+            name = standardize_str(name_element.text)
             author = ns_models.get_or_create_enum_model_from_str(
-                soup.select_one(
-                    ".header-stats > span:nth-child(1) > strong:nth-child(1) > i:nth-child(1)"
-                ).text,
+                standardize_str(author_element.text),
                 ns_models.NovelAuthor,
             )
             summary = "\n".join(
@@ -334,7 +355,10 @@ def process_novel_page(novel_link_object, website_update_instance):
                     for paragraph in soup.select_one("div.content").find_all("p")
                 ]
             )
-
+            completion_status = ns_models.get_or_create_enum_model_from_str(
+                standardize_str(completion_status_element.text),
+                ns_models.NovelCompletionStatus,
+            )
             new_novel = ns_models.Novel(
                 name=name,
                 summary=summary,
@@ -342,19 +366,18 @@ def process_novel_page(novel_link_object, website_update_instance):
                 completion_status=completion_status,
                 link=novel_link_object,
             )
-            new_novel.save()
 
             categories = [
                 ns_models.get_or_create_enum_model_from_str(
-                    category.text.strip("\n"), ns_models.NovelCategory
+                    standardize_str(category.text), ns_models.NovelCategory
                 )
-                for category in soup.select_one(".categories").find_all("li")
+                for category in categories_element.find_all("li")
             ]
             tags = [
                 ns_models.get_or_create_enum_model_from_str(
-                    tag.text.strip("\n"), ns_models.NovelTag
+                    standardize_str(tag.text), ns_models.NovelTag
                 )
-                for tag in soup.select_one(".tags").find_all("li")
+                for tag in tags_element.find_all("li")
             ]
 
             for category in categories:
@@ -362,33 +385,5 @@ def process_novel_page(novel_link_object, website_update_instance):
             for tag in tags:
                 new_novel.tags.add(tag)
 
-            novel_link_object.initialized = True
-            novel_link_object.last_updated = datetime.now(timezone.utc)
-            website_update_instance.new_novels_added += 1
-
-            novel_link_object.save()
-            new_novel.save()
-            website_update_instance.save()
-
-        else:
-            existing_novel = ns_models.Novel.objects.get(name=name.lower())
-            completion_status = ns_models.get_or_create_enum_model_from_str(
-                completion_status, ns_models.NovelCompletionStatus
-            )
-            summary = "\n".join(
-                [
-                    paragraph.text
-                    for paragraph in soup.select_one("div.content").find_all("p")
-                ]
-            )
-
-            existing_novel.summary = summary
-            existing_novel.completion_status = completion_status
-            existing_novel.save()
-
-            novel_link_object.last_updated = datetime.now(timezone.utc)
-            website_update_instance.new_novels_added += 1
-
-            existing_novel.save()
-            novel_link_object.save()
-            website_update_instance.save()
+            return new_novel
+        return None
