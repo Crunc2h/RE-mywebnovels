@@ -155,6 +155,7 @@ def get_chapter_pages(chapter_pages_directory, chapter_urls):
         chapter_pages_directory=chapter_pages_directory,
         chapter_urls=chapter_urls,
     )
+    process.start()
 
 
 def spawn_novel_links_spider(website_name):
@@ -167,14 +168,14 @@ def spawn_novel_links_spider(website_name):
 def spawn_novel_page_spider(novel_link):
     os.system(
         "gnome-terminal -- "
-        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py spawn_novel_page_spider '{novel_link}'; exec bash'"
+        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py spawn_novel_page_spider '{novel_link}'; exit;'"
     )
 
 
 def spawn_chapter_links_spider(novel_link):
     os.system(
         "gnome-terminal -- "
-        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py spawn_chapter_link_pages_spider '{novel_link}'; exec bash'"
+        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py spawn_chapter_link_pages_spider '{novel_link}'; exit;'"
     )
 
 
@@ -188,14 +189,14 @@ def spawn_chapter_pages_spider(novel_link):
 def start_novel_update(website_name, novel_link):
     os.system(
         "gnome-terminal -- "
-        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py start_novel_update '{website_name}' {novel_link}; exec bash'"
+        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py start_novel_update '{website_name}' {novel_link}; exit;'"
     )
 
 
 def start_website_update(website_name, max_allowed_processes):
     os.system(
         "gnome-terminal -- "
-        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py start_website_update '{website_name}' {max_allowed_processes}; exec bash'"
+        + f"bash -c 'source .re_venv/bin/activate; python3 manage.py start_website_update '{website_name}' {max_allowed_processes};'"
     )
 
 
@@ -256,32 +257,39 @@ def process_chapter_link_pages(novel_link_object, website_update_instance):
 
 def process_chapter_pages(novel_link_object, website_update_instance):
     chapter_pages = os.listdir(novel_link_object.chapter_pages_directory)
-    for chapter_page in chapter_pages:
+    chapter_urls = novel_link_object.get_uninitialized_chapter_links()
+    for i in range(0, len(chapter_urls)):
         with open(
-            novel_link_object.chapter_pages_directory + "/" + chapter_page,
+            novel_link_object.chapter_pages_directory + "/" + chapter_pages[i],
             "r",
         ) as file:
             soup = BeautifulSoup(file, "lxml")
+            link = chapter_urls[i]
             matching_chapter_link_object = lm_models.ChapterLink.objects.get(link=link)
-            link = soup.select_one(".titles > meta:nth-child(3)")["content"]
             if (
                 novel_link_object.chapter_link_exists(link)
                 and not matching_chapter_link_object.initialized
             ):
                 name = soup.select_one(".chapter-title").text
                 number = name.split("Chapter ")[1].split(":")[0]
-                date_published = soup.select_one(".titles > meta:nth-child(1)")[
-                    "content"
-                ].strptime("%Y-%m-%dT%H:%M:%S")
+                date_published = datetime.strptime(
+                    soup.select_one(".titles > meta:nth-child(1)")["content"],
+                    "%Y-%m-%dT%H:%M:%S",
+                )
                 chapter_text = "\n".join(
-                    soup.find(id="chapter-container").find_all("p")
+                    [
+                        paragraph_element.text
+                        for paragraph_element in soup.find(
+                            id="chapter-container"
+                        ).find_all("p")
+                    ]
                 )
                 new_chapter = ns_models.Chapter(
                     name=name,
                     number=number,
-                    link=link,
+                    link=matching_chapter_link_object,
                     date_published=date_published,
-                    novel_link=novel_link_object,
+                    novel=novel_link_object.novel,
                     text=chapter_text,
                 )
                 novel_link_object.last_updated = datetime.now(timezone.utc)

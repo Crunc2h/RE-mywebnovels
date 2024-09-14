@@ -23,11 +23,10 @@ class Command(BaseCommand):
         novel_link_object = lm_models.NovelLink.objects.get(
             link=options["novel_link"][0]
         )
-        test = novel_link_object.get_uninitialized_chapter_links()[0]
         try:
             get_chapter_pages(
                 chapter_pages_directory=novel_link_object.chapter_pages_directory,
-                chapter_urls=test,
+                chapter_urls=novel_link_object.get_uninitialized_chapter_links()[0:5],
             )
         except Exception as ex:
             spider_instance.current_grace_period += 1

@@ -1,6 +1,6 @@
+from typing import Iterable
 import scrapy
 from pathlib import Path
-
 from fake_useragent import UserAgent
 
 UA = UserAgent()
@@ -13,6 +13,7 @@ class ChapterPagesSpider(scrapy.Spider):
     start_urls = []
     custom_settings = {"USER_AGENT": UA.chrome}
     current_chapter = 1
+    download_delay = 0.5
 
     def __init__(
         self,
@@ -21,21 +22,17 @@ class ChapterPagesSpider(scrapy.Spider):
         *args,
         **kwargs,
     ):
-        self.start_urls.append(chapter_urls)
-        print(self.start_urls)
+        self.chapter_urls = chapter_urls
         self.chapter_pages_directory = chapter_pages_directory
+        super().__init__(*args, **kwargs)
 
-        super(ChapterPagesSpider, self).__init__(*args, **kwargs)
-
-    def start_requests(self):
-        for u in self.start_urls:
-            print(u)
-            yield scrapy.Request(
-                u,
-                callback=self.parse,
-            )
+    def start_requests(self) -> Iterable[scrapy.Request]:
+        for url in self.chapter_urls:
+            yield scrapy.Request(url, callback=self.parse)
+        return super().start_requests()
 
     def parse(self, response):
+
         Path(
             self.chapter_pages_directory
             + CHAPTER_PAGES_FORMAT.format(

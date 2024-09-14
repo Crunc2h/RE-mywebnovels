@@ -28,7 +28,7 @@ class Command(BaseCommand):
         update_cycle = sm_models.UpdateCycle.objects.first()
         website = lm_models.Website(
             name="webnovelpub",
-            link="www.webnovelpub.com",
+            link="www.webnovelworld.org",
             crawler_start_link="https://www.webnovelpub.pro/browse/genre-all-25060123/order-new/status-all",
         )
         website.save()
