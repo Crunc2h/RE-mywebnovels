@@ -29,14 +29,14 @@ class Command(BaseCommand):
                 crawler_start_link=website_object.crawler_start_link,
             )
         except Exception as ex:
-            spider_instance.current_grace_period += 1
+            spider_instance.current_scraper_grace_period += 1
             spider_instance.save()
             if (
-                spider_instance.current_grace_period
-                >= spider_instance.maximum_grace_period
+                spider_instance.current_scraper_grace_period
+                >= spider_instance.maximum_scraper_grace_period
             ):
                 spider_instance.state = (
-                    sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
+                    sm_models.SpiderInstanceProcessState.SCRAPER_ERROR
                 )
                 spider_instance.exception_message = str(ex)
                 spider_instance.save()
@@ -52,7 +52,7 @@ class Command(BaseCommand):
             spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
             spider_instance.save()
         except Exception as ex:
-            spider_instance.state = sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+            spider_instance.state = sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
             spider_instance.exception_message = str(ex)
             spider_instance.save()
             raise ex

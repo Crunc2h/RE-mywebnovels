@@ -91,9 +91,9 @@ class Command(BaseCommand):
             ) in website_update_instance.spider_processes.all():
                 if (
                     spider_process_instance.state
-                    == sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
+                    == sm_models.SpiderInstanceProcessState.SCRAPER_ERROR
                     or spider_process_instance.state
-                    == sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+                    == sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
                 ):
                     print(spider_process_instance.state)
                     print(spider_process_instance.exception_message)

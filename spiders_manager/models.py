@@ -70,11 +70,13 @@ class WebsiteUpdateInstance(models.Model):
 
 
 class SpiderInstanceProcessState:
-    EXTERNAL_ERROR = "external_error"
-    INTERNAL_ERROR = "internal_error"
+    SCRAPER_ERROR = "scraper_error"
+    PROCESSOR_ERROR = "processor_error"
+    LAUNCH_ERROR = "launch_error"
     IDLE = "idle"
     IN_PROGRESS = "in_progress"
     FINISHED = "finished"
+    BAD_CONTENT = "bad_content"
 
 
 class SpiderInstanceProcess(models.Model):
@@ -83,8 +85,10 @@ class SpiderInstanceProcess(models.Model):
     )
     identifier = models.CharField(max_length=8096)
     state = models.CharField(max_length=64, default=SpiderInstanceProcessState.IDLE)
-    maximum_grace_period = models.IntegerField(default=1)
-    current_grace_period = models.IntegerField(default=0)
+    maximum_scraper_grace_period = models.IntegerField(default=1)
+    current_scraper_grace_period = models.IntegerField(default=0)
+    maximum_processor_retry_unverified_content_count = models.IntegerField(default=5)
+    current_processor_retry_unverified_content_count = models.IntegerField(default=0)
     exception_message = models.CharField(max_length=4096, blank=True, null=True)
 
 
@@ -137,7 +141,6 @@ def get_novel_page(novel_directory, novel_page_url):
         novel_directory=novel_directory,
     )
     process.start()
-    print("testing gh contributions it doesnt seem to work properly")
 
 
 def get_chapter_links(novel_page_url, chapter_link_pages_dir):
