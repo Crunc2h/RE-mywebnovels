@@ -137,6 +137,7 @@ def get_novel_page(novel_directory, novel_page_url):
         novel_directory=novel_directory,
     )
     process.start()
+    print("testing gh contributions it doesnt seem to work properly")
 
 
 def get_chapter_links(novel_page_url, chapter_link_pages_dir):
