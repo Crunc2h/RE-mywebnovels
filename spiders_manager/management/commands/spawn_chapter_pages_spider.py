@@ -23,26 +23,12 @@ class Command(BaseCommand):
         novel_link_object = lm_models.NovelLink.objects.get(
             link=options["novel_link"][0]
         )
-
+        test = novel_link_object.get_uninitialized_chapter_links()[0]
         try:
             get_chapter_pages(
                 chapter_pages_directory=novel_link_object.chapter_pages_directory,
-                chapter_urls=novel_link_object.get_uninitialized_chapter_links(),
+                chapter_urls=test,
             )
-            try:
-                process_chapter_pages(
-                    novel_link_object=novel_link_object,
-                    website_update_instance=spider_instance.website_update_instance,
-                )
-                spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
-                spider_instance.save()
-            except Exception as ex:
-                spider_instance.state = (
-                    sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
-                )
-                spider_instance.exception_message = ex.message
-                spider_instance.save()
-                raise ex
         except Exception as ex:
             spider_instance.current_grace_period += 1
             spider_instance.save()
@@ -53,10 +39,22 @@ class Command(BaseCommand):
                 spider_instance.state = (
                     sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
                 )
-                spider_instance.exception_message = ex.message
+                spider_instance.exception_message = str(ex)
                 spider_instance.save()
                 raise ex
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
                 spawn_chapter_pages_spider(novel_link_object.link)
+        try:
+            process_chapter_pages(
+                novel_link_object=novel_link_object,
+                website_update_instance=spider_instance.website_update_instance,
+            )
+            spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
+            spider_instance.save()
+        except Exception as ex:
+            spider_instance.state = sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+            spider_instance.exception_message = str(ex)
+            spider_instance.save()
+            raise ex

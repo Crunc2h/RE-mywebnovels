@@ -28,19 +28,6 @@ class Command(BaseCommand):
                 novel_link_pages_dir=website_object.novel_link_pages_directory,
                 crawler_start_link=website_object.crawler_start_link,
             )
-            try:
-                process_novel_link_pages(
-                    website_object, spider_instance.website_update_instance
-                )
-                spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
-                spider_instance.save()
-            except Exception as ex:
-                spider_instance.state = (
-                    sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
-                )
-                spider_instance.exception_message(ex.message)
-                spider_instance.save()
-                raise ex
         except Exception as ex:
             spider_instance.current_grace_period += 1
             spider_instance.save()
@@ -51,9 +38,21 @@ class Command(BaseCommand):
                 spider_instance.state = (
                     sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
                 )
+                spider_instance.exception_message = str(ex)
                 spider_instance.save()
                 raise ex
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
                 spawn_novel_links_spider(website_object.name)
+        try:
+            process_novel_link_pages(
+                website_object, spider_instance.website_update_instance
+            )
+            spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
+            spider_instance.save()
+        except Exception as ex:
+            spider_instance.state = sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+            spider_instance.exception_message = str(ex)
+            spider_instance.save()
+            raise ex

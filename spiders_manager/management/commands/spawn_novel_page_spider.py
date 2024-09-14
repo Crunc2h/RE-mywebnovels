@@ -40,7 +40,7 @@ class Command(BaseCommand):
                 spider_instance.state = (
                     sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
                 )
-                spider_instance.exception_message(ex.message)
+                spider_instance.exception_message = str(ex)
                 spider_instance.save()
                 raise ex
             else:
@@ -56,4 +56,6 @@ class Command(BaseCommand):
             spider_instance.save()
         except Exception as ex:
             spider_instance.state = sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+            spider_instance.exception_message = str(ex)
+            spider_instance.save()
             raise ex

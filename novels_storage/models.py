@@ -40,19 +40,18 @@ def get_or_create_enum_model_from_str(enum_str, enum_type):
 class Novel(models.Model):
     name = models.CharField(max_length=512)
     summary = models.TextField(max_length=16256)
-    number_of_chapters = models.IntegerField()
 
     link = models.OneToOneField(
-        lm_models.NovelLink, on_delete=models.PROTECT, related_name="novel"
+        lm_models.NovelLink, on_delete=models.CASCADE, related_name="novel"
     )
     author = models.ForeignKey(
-        NovelAuthor, on_delete=models.PROTECT, related_name="novels"
+        NovelAuthor, on_delete=models.CASCADE, related_name="novels"
     )
     language = models.ForeignKey(
-        NovelLanguage, on_delete=models.PROTECT, related_name="novels", null=True
+        NovelLanguage, on_delete=models.CASCADE, related_name="novels", null=True
     )
     completion_status = models.ForeignKey(
-        NovelCompletionStatus, on_delete=models.PROTECT, related_name="novels"
+        NovelCompletionStatus, on_delete=models.CASCADE, related_name="novels"
     )
     categories = models.ManyToManyField(NovelCategory, related_name="novels")
     tags = models.ManyToManyField(NovelTag, related_name="novels")
@@ -64,12 +63,13 @@ class Novel(models.Model):
 
 class Chapter(models.Model):
     link = models.OneToOneField(
-        lm_models.ChapterLink, on_delete=models.PROTECT, related_name="chapter"
+        lm_models.ChapterLink, on_delete=models.CASCADE, related_name="chapter"
     )
     novel = models.ForeignKey(Novel, on_delete=models.CASCADE, related_name="chapters")
 
     date_published = models.DateField()
     name = models.CharField(max_length=512)
+    number = models.CharField(max_length=128)
     text = models.TextField(max_length=32512)
 
     def save(self) -> None:

@@ -88,7 +88,7 @@ class NovelLink(models.Model):
         self.chapter_pages_directory = (
             self.novel_directory + "/" + CHAPTER_PAGES_DIR_NAME
         )
-        if not os.path.exists(self.chapter_link_pages_directory):
+        if not os.path.exists(self.chapter_pages_directory):
             os.makedirs(self.chapter_pages_directory)
 
         self.slug_name = self.slug_name.lower()
@@ -103,7 +103,7 @@ class NovelLink(models.Model):
     def get_uninitialized_chapter_links(self):
         return [
             chapter_link.link
-            for chapter_link in self.chapter_links.filter(initialized=False)
+            for chapter_link in self.chapter_links.filter(initialized=False).all()
         ]
 
     def is_updatable(self):
@@ -125,10 +125,8 @@ class ChapterLink(models.Model):
     initialized = models.BooleanField(default=False)
 
 
-def db_novel_exists(novel_normal_name, novel_slug_name):
+def db_novel_exists(novel_normal_name):
     for website in Website.objects.all():
-        if website.novel_exists_normal_name(
-            novel_normal_name
-        ) or website.novel_exists_slug_name(novel_slug_name):
+        if website.novel_exists_normal_name(novel_normal_name):
             return True
     return False

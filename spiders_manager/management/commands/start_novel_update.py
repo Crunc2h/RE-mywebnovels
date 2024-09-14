@@ -29,6 +29,27 @@ class Command(BaseCommand):
             link=options["novel_link"][0]
         )
 
+        print("hello??")
+        spawn_chapter_links_spider(novel_link_object.link)
+        while True:
+            print("getting chapter links")
+            sleep(0.2)
+            spider_instance = sm_models.SpiderInstanceProcess.objects.get(
+                identifier=novel_link_object.link
+            )
+            print(spider_instance.state)
+            if (
+                spider_instance.state
+                == sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
+                or spider_instance.state
+                == sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+            ):
+                return
+            elif spider_instance.state == sm_models.SpiderInstanceProcessState.FINISHED:
+                spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
+                spider_instance.save()
+                break
+
         spawn_novel_page_spider(novel_link_object.link)
         while True:
             print("getting novel page")
@@ -36,28 +57,18 @@ class Command(BaseCommand):
             spider_instance = sm_models.SpiderInstanceProcess.objects.get(
                 identifier=novel_link_object.link
             )
+            print(spider_instance.state)
             if (
                 spider_instance.state
                 == sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
-                or sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+                or spider_instance.state
+                == sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
             ):
-                return
+                print(spider_instance.exception_message)
+                print("the fuck?")
             elif spider_instance.state == sm_models.SpiderInstanceProcessState.FINISHED:
-                break
-
-        spawn_chapter_links_spider(novel_link_object.link)
-        while True:
-            sleep(0.2)
-            spider_instance = sm_models.SpiderInstanceProcess.objects.get(
-                identifier=novel_link_object.link
-            )
-            if (
-                spider_instance.state
-                == sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
-                or sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
-            ):
-                return
-            elif spider_instance.state == sm_models.SpiderInstanceProcessState.FINISHED:
+                spider_instance.state == sm_models.SpiderInstanceProcessState.IDLE
+                spider_instance.save()
                 break
 
         spawn_chapter_pages_spider(novel_link_object.link)
@@ -66,10 +77,12 @@ class Command(BaseCommand):
             spider_instance = sm_models.SpiderInstanceProcess.objects.get(
                 identifier=novel_link_object.link
             )
+            print(spider_instance.state)
             if (
                 spider_instance.state
                 == sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
-                or sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+                or spider_instance.state
+                == sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
             ):
                 return
             elif spider_instance.state == sm_models.SpiderInstanceProcessState.FINISHED:

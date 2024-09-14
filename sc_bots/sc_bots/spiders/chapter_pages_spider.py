@@ -1,5 +1,6 @@
 import scrapy
 from pathlib import Path
+
 from fake_useragent import UserAgent
 
 UA = UserAgent()
@@ -20,9 +21,19 @@ class ChapterPagesSpider(scrapy.Spider):
         *args,
         **kwargs,
     ):
+        self.start_urls.append(chapter_urls)
+        print(self.start_urls)
         self.chapter_pages_directory = chapter_pages_directory
-        self.start_urls.extend(chapter_urls)
-        super().__init__(*args, **kwargs)
+
+        super(ChapterPagesSpider, self).__init__(*args, **kwargs)
+
+    def start_requests(self):
+        for u in self.start_urls:
+            print(u)
+            yield scrapy.Request(
+                u,
+                callback=self.parse,
+            )
 
     def parse(self, response):
         Path(

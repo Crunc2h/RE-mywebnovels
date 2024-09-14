@@ -30,20 +30,6 @@ class Command(BaseCommand):
                 chapter_link_pages_dir=novel_link_object.chapter_link_pages_directory,
                 novel_page_url=novel_link_object.link,
             )
-            try:
-                process_chapter_link_pages(
-                    novel_link_object=novel_link_object,
-                    website_update_instance=spider_instance.website_update_instance,
-                )
-                spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
-                spider_instance.save()
-            except Exception as ex:
-                spider_instance.state = (
-                    sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
-                )
-                spider_instance.exception_message(ex.message)
-                spider_instance.save()
-                raise ex
         except Exception as ex:
             spider_instance.current_grace_period += 1
             spider_instance.save()
@@ -54,10 +40,22 @@ class Command(BaseCommand):
                 spider_instance.state = (
                     sm_models.SpiderInstanceProcessState.EXTERNAL_ERROR
                 )
-                spider_instance.exception_message(ex.message)
+                spider_instance.exception_message = str(ex)
                 spider_instance.save()
                 raise ex
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
                 spawn_chapter_links_spider(novel_link_object.link)
+        try:
+            process_chapter_link_pages(
+                novel_link_object=novel_link_object,
+                website_update_instance=spider_instance.website_update_instance,
+            )
+            spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
+            spider_instance.save()
+        except Exception as ex:
+            spider_instance.state = sm_models.SpiderInstanceProcessState.INTERNAL_ERROR
+            spider_instance.exception_message = str(ex)
+            spider_instance.save()
+            raise ex
