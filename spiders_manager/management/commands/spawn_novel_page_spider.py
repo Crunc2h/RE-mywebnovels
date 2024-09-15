@@ -1,18 +1,17 @@
-import spiders_manager.models as sm_models
 import links_manager.models as lm_models
 import novels_storage.models as ns_models
-from django.core.management.base import BaseCommand
-from spiders_manager.models import (
-    get_novel_page,
-    process_novel_page,
-    spawn_novel_page_spider,
+import spiders_manager.models as sm_models
+import spiders_manager.native.spawners as spawners
+from spiders_manager.native.website_abstraction.website_interface import (
+    WebsiteInterface,
 )
-from datetime import datetime, timezone
+from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        parser.add_argument("website_name", nargs="+", type=str)
         parser.add_argument("novel_link", nargs="+", type=str)
 
     def handle(self, *args, **options):
@@ -26,6 +25,10 @@ class Command(BaseCommand):
             novel_link_object = lm_models.NovelLink.objects.get(
                 link=options["novel_link"][0]
             )
+            website = ns_models.Website.objects.get(name=options["website_name"][0])
+            website_interface = WebsiteInterface(
+                website_name=options["website_name"][0]
+            )
         except Exception as ex:
             spider_instance.state = sm_models.SpiderInstanceProcessState.LAUNCH_ERROR
             spider_instance.exception_message = str(ex)
@@ -33,8 +36,16 @@ class Command(BaseCommand):
             return
 
         try:
-            get_novel_page(
-                novel_directory=novel_link_object.novel_directory,
+            if novel_link_object.novel is None:
+                novel = ns_models.Novel(
+                    website=website,
+                    name=website_interface.get_novel_name_from_url(novel_link_object),
+                )
+                novel.save()
+            else:
+                novel = novel_link_object.novel
+            website_interface.get_novel_page(
+                novel_directory=novel.novel_directory,
                 novel_page_url=novel_link_object.link,
             )
         except Exception as ex:

@@ -1,4 +1,4 @@
-import links_manager.models as lm_models
+"""import links_manager.models as lm_models
 import spiders_manager.models as sm_models
 from spiders_manager.models import (
     get_chapter_links,
@@ -69,3 +69,4 @@ class Command(BaseCommand):
             spider_instance.exception_message = str(ex)
             spider_instance.save()
             raise ex
+"""

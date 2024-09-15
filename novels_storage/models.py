@@ -91,20 +91,30 @@ class Novel(models.Model):
     )
 
     name = models.CharField(max_length=512)
-    summary = models.TextField(max_length=16256)
-
+    summary = models.TextField(max_length=16256, blank=True, null=True)
     author = models.ForeignKey(
-        NovelAuthor, on_delete=models.CASCADE, related_name="novels"
+        NovelAuthor,
+        on_delete=models.CASCADE,
+        related_name="novels",
+        blank=True,
+        null=True,
     )
     language = models.ForeignKey(
-        NovelLanguage, on_delete=models.CASCADE, related_name="novels", null=True
+        NovelLanguage,
+        on_delete=models.CASCADE,
+        related_name="novels",
+        blank=True,
+        null=True,
     )
     completion_status = models.ForeignKey(
-        NovelCompletionStatus, on_delete=models.CASCADE, related_name="novels"
+        NovelCompletionStatus,
+        on_delete=models.CASCADE,
+        related_name="novels",
+        blank=True,
+        null=True,
     )
     categories = models.ManyToManyField(NovelCategory, related_name="novels")
     tags = models.ManyToManyField(NovelTag, related_name="novels")
-
     novel_directory = models.CharField(max_length=2048, blank=True, null=True)
     chapter_link_pages_directory = models.CharField(
         max_length=2048, blank=True, null=True
@@ -115,6 +125,7 @@ class Novel(models.Model):
         max_length=2048, blank=True, null=True
     )
     chapter_pages_directory = models.CharField(max_length=2048, blank=True, null=True)
+    initialized = models.BooleanField(default=False)
 
     def save(self) -> None:
         self.name = standardize_str(self.name)
