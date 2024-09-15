@@ -55,7 +55,7 @@ class Command(BaseCommand):
                 return
         try:
             new_chapters, unverified_pages = process_chapter_pages(
-                novel_link_object=novel_link_object,
+                novel=novel_link_object,
                 website_update_instance=spider_instance.website_update_instance,
             )
             for new_chapter in new_chapters:

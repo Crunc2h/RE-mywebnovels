@@ -56,7 +56,7 @@ class Command(BaseCommand):
                 return
 
         try:
-            novel = process_novel_page(novel_link_object=novel_link_object)
+            novel = process_novel_page(novel=novel_link_object)
             if (
                 novel is None
                 and spider_instance.current_processor_retry_unverified_content_count

@@ -13,12 +13,14 @@ from sc_bots.sc_bots.spiders.novel_page_spider import (
 )
 from sc_bots.sc_bots.spiders.chapter_pages_spider import ChapterPagesSpider
 from datetime import datetime, timezone
+from cout.native.common import standardize_str
 
 
 class UpdateCycle(models.Model):
     t_start = models.DateTimeField(auto_now=True)
     maximum_processes = models.IntegerField()
     alive_processes = models.IntegerField(default=0)
+
     processes_finished = models.IntegerField(default=0)
     processes_in_progress = models.IntegerField(default=0)
     processes_error = models.IntegerField(default=0)
@@ -117,10 +119,6 @@ def get_novel_name_from_slug(slug_name):
     return standardize_str(" ".join(slug_name.split("-")))
 
 
-def standardize_str(s):
-    return s.strip().strip("\n").lower()
-
-
 def get_novel_links(novel_link_pages_dir, crawler_start_link):
     process = CrawlerProcess()
     process.crawl(
@@ -208,27 +206,29 @@ def start_website_update(website_name, max_allowed_processes):
     )
 
 
-def process_novel_link_pages(website_object, get_novel_slug_name, unverified_pages=[]):
+def process_novel_link_pages(website, get_novel_name_from_link, unverified_pages=[]):
     if len(unverified_pages) > 0:
         novel_link_pages = unverified_pages
     else:
-        novel_link_pages = os.listdir(website_object.novel_link_pages_directory)
+        novel_link_pages = os.listdir(website.novel_link_pages_directory)
 
     new_novel_links = []
     unverified_pages = []
 
     for novel_link_page in novel_link_pages:
-        file_path = website_object.novel_link_pages_directory + "/" + novel_link_page
+        file_path = website.novel_link_pages_directory + "/" + novel_link_page
         with open(file_path, "r") as file:
             soup = BeautifulSoup(file, "lxml")
             for novel_item in soup.find_all(class_="novel-item"):
-                link_element = website_object.link + novel_item.find("a")
+                link_element = novel_item.find("a")
                 if link_element != None:
                     new_novel_links.append(
                         lm_models.NovelLink(
-                            webite=website_object,
-                            link=link_element["href"],
-                            slug_name=get_novel_slug_name(link_element["href"]),
+                            webite=website,
+                            link=website.link_object.base_link + link_element["href"],
+                            name=standardize_str(
+                                get_novel_name_from_link(link_element["href"])
+                            ),
                         )
                     )
                 else:
@@ -237,31 +237,30 @@ def process_novel_link_pages(website_object, get_novel_slug_name, unverified_pag
     return new_novel_links, unverified_pages
 
 
-def process_chapter_link_pages(novel_link_object, unverified_pages=[]):
+def process_chapter_link_pages(novel, novel_link, unverified_pages=[]):
     if len(unverified_pages) > 0:
         chapter_link_pages = unverified_pages
     else:
-        chapter_link_pages = os.listdir(novel_link_object.chapter_link_pages_directory)
+        chapter_link_pages = os.listdir(novel.chapter_link_pages_directory)
 
     new_chapter_links = []
     unverified_pages = []
 
     for chapter_link_page in chapter_link_pages:
-        file_path = (
-            novel_link_object.chapter_link_pages_directory + "/" + chapter_link_page
-        )
+        file_path = novel.chapter_link_pages_directory + "/" + chapter_link_page
         with open(file_path, "r") as file:
             soup = BeautifulSoup(file, "lxml")
             chapter_list = soup.select_one(".chapter-list")
             for chapter_item in chapter_list.find_all("li"):
-                link_element = novel_link_object.website.link + chapter_item.find("a")
+                link_element = chapter_item.find("a")
                 name_element = chapter_item.find(class_="chapter-title")
                 if link_element != None and name_element != None:
                     new_chapter_links.append(
                         lm_models.ChapterLink(
-                            novel_link=novel_link_object,
+                            novel_link=novel_link,
                             name=standardize_str(name_element.text),
-                            link=link_element["href"],
+                            link=novel_link.website_link.base_link
+                            + link_element["href"],
                         )
                     )
                 else:
@@ -270,17 +269,17 @@ def process_chapter_link_pages(novel_link_object, unverified_pages=[]):
     return new_chapter_links, unverified_pages
 
 
-def process_chapter_pages(novel_link_object, unverified_pages=[]):
+def process_chapter_pages(novel, unverified_pages=[]):
     if len(unverified_pages) > 0:
         chapter_pages = unverified_pages
     else:
-        chapter_pages = os.listdir(novel_link_object.chapter_pages_directory)
+        chapter_pages = os.listdir(novel.chapter_pages_directory)
 
     new_chapters = []
     unverified_pages = []
 
     for chapter_page in chapter_pages:
-        file_path = novel_link_object.chapter_pages_directory + "/" + chapter_page
+        file_path = novel.chapter_pages_directory + "/" + chapter_page
         with open(file_path, "r") as file:
             soup = BeautifulSoup(file, "lxml")
             name_element = soup.select_one(".chapter-title")
@@ -314,7 +313,7 @@ def process_chapter_pages(novel_link_object, unverified_pages=[]):
                         number=number,
                         link=matching_chapter_link_object,
                         date_published=date_published,
-                        novel=novel_link_object.novel,
+                        novel=novel.novel,
                         text=chapter_text,
                     )
                 )
@@ -323,8 +322,8 @@ def process_chapter_pages(novel_link_object, unverified_pages=[]):
     return new_chapters, unverified_pages
 
 
-def process_novel_page(novel_link_object):
-    file_path = novel_link_object.novel_directory + NOVEL_PAGE_FORMAT.format(
+def process_novel_page(novel):
+    file_path = novel.novel_directory + NOVEL_PAGE_FORMAT.format(
         file_format=FILE_FORMAT
     )
     with open(file_path, "r") as file:
@@ -368,9 +367,7 @@ def process_novel_page(novel_link_object):
                 summary=summary,
                 author=author,
                 completion_status=completion_status,
-                link=novel_link_object,
             )
-
             categories = [
                 ns_models.get_or_create_enum_model_from_str(
                     standardize_str(category.text), ns_models.NovelCategory

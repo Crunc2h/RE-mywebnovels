@@ -56,9 +56,12 @@ class Command(BaseCommand):
 
         try:
             new_chapter_links, unverified_pages = process_chapter_link_pages(
-                novel_link_object=novel_link_object,
+                novel=novel_link_object,
                 website_update_instance=spider_instance.website_update_instance,
             )
+
+            for new_chapter_link in new_chapter_links:
+                pass
             spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
             spider_instance.save()
         except Exception as ex:
