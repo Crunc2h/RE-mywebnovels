@@ -1,6 +1,6 @@
+*.html
+*.sh
+*.gitignore
 *.sqlite3
 __pycache__/
 .re_venv/
-*.sh
-*.gitignore
-*.html
