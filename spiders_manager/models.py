@@ -1,19 +1,11 @@
 import os
 import links_manager.models as lm_models
-import novels_storage.models as ns_models
 from django.db import models
 from scrapy.crawler import CrawlerProcess
-from bs4 import BeautifulSoup
 from sc_bots.sc_bots.spiders.novel_link_pages_spider import NovelLinkPagesSpider
 from sc_bots.sc_bots.spiders.chapter_link_pages_spider import ChapterLinkPagesSpider
-from sc_bots.sc_bots.spiders.novel_page_spider import (
-    NovelPageSpider,
-    FILE_FORMAT,
-    NOVEL_PAGE_FORMAT,
-)
+from sc_bots.sc_bots.spiders.novel_page_spider import NovelPageSpider
 from sc_bots.sc_bots.spiders.chapter_pages_spider import ChapterPagesSpider
-from datetime import datetime, timezone
-from cout.native.common import standardize_str
 
 
 class UpdateCycle(models.Model):
@@ -89,34 +81,10 @@ class SpiderInstanceProcess(models.Model):
     state = models.CharField(max_length=64, default=SpiderInstanceProcessState.IDLE)
     maximum_scraper_grace_period = models.IntegerField(default=1)
     current_scraper_grace_period = models.IntegerField(default=0)
-    maximum_processor_retry_unverified_content_count = models.IntegerField(default=5)
+    maximum_processor_retry_unverified_content_count = models.IntegerField(default=1)
     current_processor_retry_unverified_content_count = models.IntegerField(default=0)
+    bad_content = models.CharField(max_length=32128, blank=True, null=True)
     exception_message = models.CharField(max_length=4096, blank=True, null=True)
-
-
-def get_next_page(response):
-    return response.css(".PagedList-skipToNext > a:nth-child(1)::attr(href)").get()
-
-
-def get_max_page(response):
-    skip_last_link = response.css(
-        ".PagedList-skipToLast > a:nth-child(1)::attr(href)"
-    ).get()
-    if skip_last_link != None:
-        return skip_last_link.split("page=")[1]
-    return None
-
-
-def get_chapters_index_page(response):
-    return response.css("a.grdbtn:nth-child(1)::attr(href)").get()
-
-
-def get_novel_slug_name(url):
-    return standardize_str(url.split("novel/")[1])
-
-
-def get_novel_name_from_slug(slug_name):
-    return standardize_str(" ".join(slug_name.split("-")))
 
 
 def get_novel_links(novel_link_pages_dir, crawler_start_link):
@@ -204,187 +172,3 @@ def start_website_update(website_name, max_allowed_processes):
         "gnome-terminal -- "
         + f"bash -c 'source .re_venv/bin/activate; python3 manage.py start_website_update '{website_name}' {max_allowed_processes};'"
     )
-
-
-def process_novel_link_pages(website, get_novel_name_from_link, unverified_pages=[]):
-    if len(unverified_pages) > 0:
-        novel_link_pages = unverified_pages
-    else:
-        novel_link_pages = os.listdir(website.novel_link_pages_directory)
-
-    new_novel_links = []
-    unverified_pages = []
-
-    for novel_link_page in novel_link_pages:
-        file_path = website.novel_link_pages_directory + "/" + novel_link_page
-        with open(file_path, "r") as file:
-            soup = BeautifulSoup(file, "lxml")
-            for novel_item in soup.find_all(class_="novel-item"):
-                link_element = novel_item.find("a")
-                if link_element != None:
-                    new_novel_links.append(
-                        lm_models.NovelLink(
-                            webite=website,
-                            link=website.link_object.base_link + link_element["href"],
-                            name=standardize_str(
-                                get_novel_name_from_link(link_element["href"])
-                            ),
-                        )
-                    )
-                else:
-                    if file_path not in unverified_pages:
-                        unverified_pages.append(file_path)
-    return new_novel_links, unverified_pages
-
-
-def process_chapter_link_pages(novel, novel_link, unverified_pages=[]):
-    if len(unverified_pages) > 0:
-        chapter_link_pages = unverified_pages
-    else:
-        chapter_link_pages = os.listdir(novel.chapter_link_pages_directory)
-
-    new_chapter_links = []
-    unverified_pages = []
-
-    for chapter_link_page in chapter_link_pages:
-        file_path = novel.chapter_link_pages_directory + "/" + chapter_link_page
-        with open(file_path, "r") as file:
-            soup = BeautifulSoup(file, "lxml")
-            chapter_list = soup.select_one(".chapter-list")
-            for chapter_item in chapter_list.find_all("li"):
-                link_element = chapter_item.find("a")
-                name_element = chapter_item.find(class_="chapter-title")
-                if link_element != None and name_element != None:
-                    new_chapter_links.append(
-                        lm_models.ChapterLink(
-                            novel_link=novel_link,
-                            name=standardize_str(name_element.text),
-                            link=novel_link.website_link.base_link
-                            + link_element["href"],
-                        )
-                    )
-                else:
-                    if file_path not in unverified_pages:
-                        unverified_pages.append(file_path)
-    return new_chapter_links, unverified_pages
-
-
-def process_chapter_pages(novel, unverified_pages=[]):
-    if len(unverified_pages) > 0:
-        chapter_pages = unverified_pages
-    else:
-        chapter_pages = os.listdir(novel.chapter_pages_directory)
-
-    new_chapters = []
-    unverified_pages = []
-
-    for chapter_page in chapter_pages:
-        file_path = novel.chapter_pages_directory + "/" + chapter_page
-        with open(file_path, "r") as file:
-            soup = BeautifulSoup(file, "lxml")
-            name_element = soup.select_one(".chapter-title")
-            if name_element != None:
-                name = standardize_str(name_element)
-                matching_chapter_link_object = lm_models.ChapterLink.objects.get(
-                    name_element
-                )
-            else:
-                unverified_pages.append(file_path)
-                continue
-
-            date_published_element = soup.select_one(".titles > meta:nth-child(1)")
-            chapter_container_element = soup.find(id="chapter-container")
-
-            if date_published_element != None and chapter_container_element != None:
-                number = standardize_str(name.split("Chapter ")[1].split(":")[0])
-                date_published = datetime.strptime(
-                    date_published_element["content"],
-                    "%Y-%m-%dT%H:%M:%S",
-                )
-                chapter_text = "\n".join(
-                    [
-                        paragraph_element.text
-                        for paragraph_element in chapter_container_element.find_all("p")
-                    ]
-                )
-                new_chapters.append(
-                    ns_models.Chapter(
-                        name=name,
-                        number=number,
-                        link=matching_chapter_link_object,
-                        date_published=date_published,
-                        novel=novel.novel,
-                        text=chapter_text,
-                    )
-                )
-            else:
-                unverified_pages.append(file_path)
-    return new_chapters, unverified_pages
-
-
-def process_novel_page(novel):
-    file_path = novel.novel_directory + NOVEL_PAGE_FORMAT.format(
-        file_format=FILE_FORMAT
-    )
-    with open(file_path, "r") as file:
-        soup = BeautifulSoup(file, "lxml")
-        name_element = soup.select_one(".novel-title")
-        author_element = soup.select_one(
-            ".header-stats > span:nth-child(1) > strong:nth-child(1) > i:nth-child(1)"
-        )
-        summary_element = soup.select_one("div.content")
-        completion_status_element = soup.select_one(".completed")
-        if completion_status_element is None:
-            completion_status_element = soup.select_one(".ongoing")
-        categories_element = soup.select_one(".categories")
-        tags_element = soup.select_one(".tags")
-
-        if (
-            name_element
-            and author_element
-            and summary_element
-            and completion_status_element
-            and categories_element
-            and tags_element
-        ):
-            name = standardize_str(name_element.text)
-            author = ns_models.get_or_create_enum_model_from_str(
-                standardize_str(author_element.text),
-                ns_models.NovelAuthor,
-            )
-            summary = "\n".join(
-                [
-                    paragraph.text
-                    for paragraph in soup.select_one("div.content").find_all("p")
-                ]
-            )
-            completion_status = ns_models.get_or_create_enum_model_from_str(
-                standardize_str(completion_status_element.text),
-                ns_models.NovelCompletionStatus,
-            )
-            new_novel = ns_models.Novel(
-                name=name,
-                summary=summary,
-                author=author,
-                completion_status=completion_status,
-            )
-            categories = [
-                ns_models.get_or_create_enum_model_from_str(
-                    standardize_str(category.text), ns_models.NovelCategory
-                )
-                for category in categories_element.find_all("li")
-            ]
-            tags = [
-                ns_models.get_or_create_enum_model_from_str(
-                    standardize_str(tag.text), ns_models.NovelTag
-                )
-                for tag in tags_element.find_all("li")
-            ]
-
-            for category in categories:
-                new_novel.categories.add(category)
-            for tag in tags:
-                new_novel.tags.add(tag)
-
-            return new_novel
-        return None

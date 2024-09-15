@@ -19,14 +19,14 @@ class ChapterLinkPagesSpider(scrapy.Spider):
         chapter_link_pages_directory,
         get_next_page,
         get_max_page,
-        chapter_link_pages_url,
+        novel_page_url,
         *args,
         **kwargs,
     ):
         self.chapter_link_pages_directory = chapter_link_pages_directory
         self.get_next_page = get_next_page
         self.get_max_page = get_max_page
-        self.start_urls.append(chapter_link_pages_url)
+        self.start_urls.append(novel_page_url)
         super().__init__(*args, **kwargs)
 
     def parse(self, response):
