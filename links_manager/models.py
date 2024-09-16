@@ -38,8 +38,5 @@ class ChapterLink(models.Model):
         on_delete=models.CASCADE,
         related_name="chapter_links",
     )
-    chapter = models.ForeignKey(
-        ns_models.Chapter, on_delete=models.CASCADE, related_name="links", null=True
-    )
     link = models.CharField(max_length=8096)
     name = models.CharField(max_length=1024)

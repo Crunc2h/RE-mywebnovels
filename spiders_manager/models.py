@@ -62,10 +62,10 @@ class WebsiteUpdateInstance(models.Model):
 class SpiderInstanceProcessState:
     SCRAPER_ERROR = "scraper_error"
     PROCESSOR_ERROR = "processor_error"
-    LAUNCH_ERROR = "launch_error"
     IDLE = "idle"
     IN_PROGRESS = "in_progress"
     FINISHED = "finished"
+    COMPLETE = "complete"
     BAD_CONTENT = "bad_content"
 
 
@@ -77,7 +77,7 @@ class SpiderInstanceProcess(models.Model):
     state = models.CharField(max_length=64, default=SpiderInstanceProcessState.IDLE)
     maximum_scraper_grace_period = models.IntegerField(default=1)
     current_scraper_grace_period = models.IntegerField(default=0)
-    maximum_processor_retry_unverified_content_count = models.IntegerField(default=1)
-    current_processor_retry_unverified_content_count = models.IntegerField(default=0)
+    max_processor_retry_on_bad_content = models.IntegerField(default=5)
+    current_processor_retry_on_bad_content = models.IntegerField(default=0)
     bad_content_page_paths = models.CharField(max_length=32128, blank=True, null=True)
     exception_message = models.CharField(max_length=4096, blank=True, null=True)

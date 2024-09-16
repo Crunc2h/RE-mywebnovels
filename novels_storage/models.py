@@ -89,7 +89,6 @@ class Novel(models.Model):
     website = models.ForeignKey(
         Website, on_delete=models.CASCADE, related_name="novels"
     )
-
     name = models.CharField(max_length=512)
     summary = models.TextField(max_length=16256, blank=True, null=True)
     author = models.ForeignKey(
@@ -126,11 +125,26 @@ class Novel(models.Model):
     )
     chapter_pages_directory = models.CharField(max_length=2048, blank=True, null=True)
     initialized = models.BooleanField(default=False)
+    is_being_updated = models.BooleanField(default=False)
+
+    def __str__(self) -> str:
+        return f"Novel --> {self.name}\n\
+Author: {self.author.name}\n\
+Completion Status: {self.completion_status.name}\n\
+Initialized: {self.initialized}\n\
+Is Being Updated: {self.is_being_updated}\n\
+Links: {[link_object.link for link_object in self.links.all()]}\n\
+Categories --> {[category.name for category in self.categories.all()]}\n\
+Tags --> {[tag.name for tag in self.tags.all()]}"
 
     def save(self) -> None:
         self.name = standardize_str(self.name)
 
-        self.novel_directory = self.website.novels_directory + "/" + self.slug_name
+        self.novel_directory = (
+            self.website.novels_directory
+            + "/"
+            + "".join([letter for letter in self.name if letter != " "])
+        )
         if not os.path.exists(self.novel_directory):
             os.makedirs(self.novel_directory)
 
@@ -149,6 +163,8 @@ class Novel(models.Model):
         return super().save()
 
     def is_updatable(self):
+        if self.is_being_updated:
+            return False
         if self.chapters.count() == 0:
             return True
         return (

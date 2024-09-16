@@ -14,20 +14,14 @@ class Command(BaseCommand):
         parser.add_argument("website_name", nargs="+", type=str)
 
     def handle(self, *args, **options):
+        website = ns_models.Website.objects.get(name=options["website_name"][0])
+        website_interface = WebsiteInterface(website.name)
+
         spider_instance = sm_models.SpiderInstanceProcess.objects.get(
             identifier=options["website_name"][0]
         )
         spider_instance.state = sm_models.SpiderInstanceProcessState.IN_PROGRESS
         spider_instance.save()
-
-        try:
-            website = ns_models.Website.objects.get(name=options["website_name"][0])
-            website_interface = WebsiteInterface(website.name)
-        except Exception as ex:
-            spider_instance.state = sm_models.SpiderInstanceProcessState.LAUNCH_ERROR
-            spider_instance.exception_message = str(ex)
-            spider_instance.save()
-            return
 
         try:
             website_interface.get_novel_links(
@@ -46,32 +40,31 @@ class Command(BaseCommand):
                 )
                 spider_instance.exception_message = str(ex)
                 spider_instance.save()
-                return
+                raise ex
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
                 spawn_novel_links_spider(website.name)
         try:
             new_novel_links, bad_pages = website_interface.process_novel_link_pages(
-                website.link_object, spider_instance.website_update_instance
+                website.link_object,
+                website.novel_link_pages_directory,
             )
             for new_novel_link in new_novel_links:
                 if not website.link_object.novel_link_exists(new_novel_link.link):
                     new_novel_link.save()
-
             if (
                 len(bad_pages) > 0
-                and spider_instance.current_processor_retry_unverified_content_count
-                < spider_instance.maximum_processor_retry_unverified_content_count
+                and spider_instance.current_processor_retry_on_bad_content
+                < spider_instance.max_processor_retry_on_bad_content
             ):
-                spider_instance.current_processor_retry_unverified_content_count += 1
+                spider_instance.current_processor_retry_on_bad_content += 1
                 spider_instance.save()
                 spawn_novel_links_spider(website.name)
-                return
             elif (
                 len(bad_pages) > 0
-                and spider_instance.current_processor_retry_unverified_content_count
-                >= spider_instance.maximum_processor_retry_unverified_content_count
+                and spider_instance.current_processor_retry_on_bad_content
+                >= spider_instance.max_processor_retry_on_bad_content
             ):
                 spider_instance.bad_content_page_paths = "\n".join(bad_pages)
                 spider_instance.state = sm_models.SpiderInstanceProcessState.BAD_CONTENT
@@ -82,3 +75,4 @@ class Command(BaseCommand):
             spider_instance.state = sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
             spider_instance.exception_message = str(ex)
             spider_instance.save()
+            raise ex

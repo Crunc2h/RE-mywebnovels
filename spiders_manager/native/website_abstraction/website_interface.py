@@ -1,12 +1,8 @@
 import novels_storage.models as ns_models
-import webnovelpub
 from cout.native.common import standardize_str
-import webnovelpub.common
-import webnovelpub.processors
+import spiders_manager.native.website_abstraction.webnovelpub.common as webnovelpub_common
+import spiders_manager.native.website_abstraction.webnovelpub.processors as webnovelpub_processors
 import os
-from spiders_manager.native.website_abstraction.website_interface import (
-    WebsiteInterface,
-)
 from bs4 import BeautifulSoup
 from scrapy.crawler import CrawlerProcess
 from sc_bots.sc_bots.spiders.novel_link_pages_spider import NovelLinkPagesSpider
@@ -20,17 +16,17 @@ class WebsiteInterface:
         exists = ns_models.Website.objects.get(name=standardize_str(website_name))
         if website_name == "webnovelpub":
             self.novel_link_page_processor = (
-                webnovelpub.processors.novel_link_page_processor
+                webnovelpub_processors.novel_link_page_processor
             )
             self.chapter_link_page_processor = (
-                webnovelpub.processors.chapter_link_page_processor
+                webnovelpub_processors.chapter_link_page_processor
             )
-            self.novel_page_processor = webnovelpub.processors.novel_page_processor
-            self.chapter_page_processor = webnovelpub.processors.chapter_page_processor
-            self.get_next_page = webnovelpub.common.get_next_page
-            self.get_max_page = webnovelpub.common.get_max_page
-            self.get_chapters_index_page = webnovelpub.common.get_chapters_index_page
-            self.get_novel_name_from_url = webnovelpub.common.get_novel_name_from_url
+            self.novel_page_processor = webnovelpub_processors.novel_page_processor
+            self.chapter_page_processor = webnovelpub_processors.chapter_page_processor
+            self.get_next_page = webnovelpub_common.get_next_page
+            self.get_max_page = webnovelpub_common.get_max_page
+            self.get_chapters_index_page = webnovelpub_common.get_chapters_index_page
+            self.get_novel_name_from_url = webnovelpub_common.get_novel_name_from_url
 
     def process_novel_link_pages(
         self,
@@ -94,12 +90,11 @@ class WebsiteInterface:
             file_path = novel_object.chapter_pages_directory + "/" + chapter_page
             with open(file_path, "r") as file:
                 soup = BeautifulSoup(file, "lxml")
-                chapters_in_page, bad_contents_in_page = self.chapter_page_processor(
-                    soup, novel_object
-                )
-                if bad_contents_in_page and file_path not in bad_pages:
+                new_chapter = self.chapter_page_processor(soup, novel_object)
+                if new_chapter is None:
                     bad_pages.append(file_path)
-                new_chapters.extend(chapters_in_page)
+                else:
+                    new_chapters.append(new_chapter)
         return new_chapters, bad_pages
 
     def process_novel_page(self, novel_directory, novel_page_format, file_format):
@@ -119,7 +114,7 @@ class WebsiteInterface:
         )
         process.start()
 
-    def get_novel_page(novel_directory, novel_page_url):
+    def get_novel_page(self, novel_directory, novel_page_url):
         process = CrawlerProcess()
         process.crawl(
             NovelPageSpider,
@@ -140,11 +135,11 @@ class WebsiteInterface:
         )
         process.start()
 
-    def get_chapter_pages(self, chapter_urls):
+    def get_chapter_pages(self, chapter_urls, chapter_pages_directory):
         process = CrawlerProcess()
         process.crawl(
             ChapterPagesSpider,
-            chapter_pages_directory=self,
+            chapter_pages_directory=chapter_pages_directory,
             chapter_urls=chapter_urls,
         )
         process.start()

@@ -1,6 +1,6 @@
 import links_manager.models as lm_models
 import novels_storage.models as ns_models
-import common
+import spiders_manager.native.website_abstraction.webnovelpub.common as common
 from cout.native.common import standardize_str
 from datetime import datetime
 
@@ -16,7 +16,7 @@ def novel_link_page_processor(
         if link_element != None:
             novel_links_in_page.append(
                 lm_models.NovelLink(
-                    webite_link=website_link_object,
+                    website_link=website_link_object,
                     link=website_link_object.base_link + link_element["href"],
                     name=get_novel_name_from_url(link_element["href"]),
                 )
@@ -31,6 +31,10 @@ def chapter_link_page_processor(soup, novel_link_object):
     bad_content_in_page = False
 
     chapter_list = soup.select_one(".chapter-list")
+    if not chapter_list:
+        bad_content_in_page = True
+        return chapter_links_in_page, bad_content_in_page
+
     for chapter_item in chapter_list.find_all("li"):
         link_element = chapter_item.find("a")
         name_element = chapter_item.find(class_="chapter-title")
@@ -39,7 +43,8 @@ def chapter_link_page_processor(soup, novel_link_object):
                 lm_models.ChapterLink(
                     novel_link=novel_link_object,
                     name=standardize_str(name_element.text),
-                    link=novel_link_object.link + link_element["href"],
+                    link=novel_link_object.website_link.base_link
+                    + link_element["href"],
                 )
             )
         else:
@@ -61,7 +66,7 @@ def chapter_page_processor(
         and chapter_container_element != None
     ):
         name = standardize_str(name_element.text)
-        number = get_chapter_number_from_title(name)
+        number = get_chapter_number_from_title(name_element.text)
         date_published = datetime.strptime(
             date_published_element["content"],
             "%Y-%m-%dT%H:%M:%S",
@@ -72,7 +77,6 @@ def chapter_page_processor(
                 for paragraph_element in chapter_container_element.find_all("p")
             ]
         )
-
         return ns_models.Chapter(
             name=name,
             number=number,
@@ -85,9 +89,7 @@ def chapter_page_processor(
 
 def novel_page_processor(soup):
     name_element = soup.select_one(".novel-title")
-    author_element = soup.select_one(
-        ".header-stats > span:nth-child(1) > strong:nth-child(1) > i:nth-child(1)"
-    )
+    author_element = soup.select_one("a.property-item:nth-child(2) > span:nth-child(1)")
     summary_element = soup.select_one("div.content")
     completion_status_element = soup.select_one(".completed")
     if completion_status_element is None:
@@ -137,10 +139,10 @@ def novel_page_processor(soup):
             for tag in tags_element.find_all("li")
         ]
 
-        for category in categories:
-            new_novel.categories.add(category)
-        for tag in tags:
-            new_novel.tags.add(tag)
+        m2m = {
+            "categories": categories,
+            "tags": tags,
+        }
 
-        return new_novel
+        return new_novel, m2m
     return None

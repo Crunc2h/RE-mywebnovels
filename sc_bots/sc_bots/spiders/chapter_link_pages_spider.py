@@ -17,6 +17,7 @@ class ChapterLinkPagesSpider(scrapy.Spider):
     def __init__(
         self,
         chapter_link_pages_directory,
+        get_chapters_index_page,
         get_next_page,
         get_max_page,
         novel_page_url,
@@ -24,27 +25,31 @@ class ChapterLinkPagesSpider(scrapy.Spider):
         **kwargs,
     ):
         self.chapter_link_pages_directory = chapter_link_pages_directory
+        self.get_chapters_index_page = get_chapters_index_page
+        self.novel_page_url = novel_page_url
         self.get_next_page = get_next_page
         self.get_max_page = get_max_page
         self.start_urls.append(novel_page_url)
         super().__init__(*args, **kwargs)
 
     def parse(self, response):
-        if not self.max_page:
-            self.max_page = self.get_max_page(response)
+        if response.url == self.novel_page_url:
+            yield response.follow(self.get_chapters_index_page(response), self.parse)
+        else:
+            if not self.max_page:
+                self.max_page = self.get_max_page(response)
             if self.max_page == None:
                 self.max_page = -1
-        Path(
-            self.chapter_link_pages_directory
-            + CHAPTER_LINK_PAGES_FORMAT.format(
-                current_page=self.current_page, file_format=FILE_FORMAT
-            )
-        ).write_bytes(response.body)
-        self.current_page += 1
-        next_page = self.get_next_page(response)
-        if not next_page:
-            if self.current_page != self.max_page and self.max_page != -1:
-                raise Exception()
-            return
-
-        yield response.follow(next_page, self.parse)
+            Path(
+                self.chapter_link_pages_directory
+                + CHAPTER_LINK_PAGES_FORMAT.format(
+                    current_page=self.current_page, file_format=FILE_FORMAT
+                )
+            ).write_bytes(response.body)
+            self.current_page += 1
+            next_page = self.get_next_page(response)
+            if not next_page:
+                if self.current_page != self.max_page and self.max_page != -1:
+                    raise Exception()
+                return
+            yield response.follow(next_page, self.parse)

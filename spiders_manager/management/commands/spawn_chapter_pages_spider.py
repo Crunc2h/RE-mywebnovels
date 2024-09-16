@@ -1,9 +1,9 @@
-"""import links_manager.models as lm_models
+import links_manager.models as lm_models
 import spiders_manager.models as sm_models
-from spiders_manager.models import (
-    get_chapter_pages,
-    process_chapter_pages,
-    spawn_chapter_pages_spider,
+import novels_storage.models as ns_models
+import spiders_manager.native.spawners as spawners
+from spiders_manager.native.website_abstraction.website_interface import (
+    WebsiteInterface,
 )
 from django.core.management.base import BaseCommand
 from django.core.exceptions import ObjectDoesNotExist
@@ -12,9 +12,16 @@ from django.core.exceptions import ObjectDoesNotExist
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        parser.add_argument("website_name", nargs="+", type=str)
         parser.add_argument("novel_link", nargs="+", type=str)
 
     def handle(self, *args, **options):
+        website = ns_models.Website.objects.get(name=options["website_name"][0])
+        website_interface = WebsiteInterface(website.name)
+        novel_link_object = lm_models.NovelLink.objects.get(
+            link=options["novel_link"][0]
+        )
+
         spider_instance = sm_models.SpiderInstanceProcess.objects.get(
             identifier=options["novel_link"][0]
         )
@@ -22,19 +29,12 @@ class Command(BaseCommand):
         spider_instance.save()
 
         try:
-            novel_link_object = lm_models.NovelLink.objects.get(
-                link=options["novel_link"][0]
-            )
-        except Exception as ex:
-            spider_instance.state = sm_models.SpiderInstanceProcessState.LAUNCH_ERROR
-            spider_instance.exception_message = str(ex)
-            spider_instance.save()
-            return
-
-        try:
-            get_chapter_pages(
-                chapter_pages_directory=novel_link_object.chapter_pages_directory,
-                chapter_urls=novel_link_object.get_uninitialized_chapter_links(),
+            website_interface.get_chapter_pages(
+                chapter_pages_directory=novel_link_object.novel.chapter_pages_directory,
+                chapter_urls=[
+                    chapter_link_object.link
+                    for chapter_link_object in novel_link_object.chapter_links.all()
+                ],
             )
         except Exception as ex:
             spider_instance.current_scraper_grace_period += 1
@@ -47,45 +47,47 @@ class Command(BaseCommand):
                 )
                 spider_instance.exception_message = str(ex)
                 spider_instance.save()
-                return
+                raise ex
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
-                spawn_chapter_pages_spider(novel_link_object.link)
+                spawners.spawn_chapter_pages_spider(
+                    website.name, novel_link_object.link
+                )
                 return
         try:
-            new_chapters, unverified_pages = process_chapter_pages(
-                novel=novel_link_object,
-                website_update_instance=spider_instance.website_update_instance,
+            new_chapters, bad_pages = website_interface.process_chapter_pages(
+                novel_object=novel_link_object.novel,
             )
             for new_chapter in new_chapters:
-                new_chapter.link.initialized = True
-                new_chapter.save()
-                new_chapter.link.save()
+                if (
+                    novel_link_object.novel.get_chapter_of_name(new_chapter.name)
+                    is None
+                ):
+                    new_chapter.save()
+
             if (
-                len(unverified_pages) > 0
-                and spider_instance.current_processor_retry_unverified_content_count
-                < spider_instance.maximum_processor_retry_unverified_content_count
+                len(bad_pages) > 0
+                and spider_instance.current_processor_retry_on_bad_content
+                < spider_instance.max_processor_retry_on_bad_content
             ):
-                spider_instance.current_processor_retry_unverified_content_count += 1
+                spider_instance.current_processor_retry_on_bad_content += 1
                 spider_instance.save()
-                spawn_chapter_pages_spider(novel_link_object.link)
+                spawners.spawn_chapter_pages_spider(
+                    website.name, novel_link_object.link
+                )
                 return
             elif (
-                len(unverified_pages) > 0
-                and spider_instance.current_processor_retry_unverified_content_count
-                >= spider_instance.maximum_processor_retry_unverified_content_count
+                len(bad_pages) > 0
+                and spider_instance.current_processor_retry_on_bad_content
+                >= spider_instance.max_processor_retry_on_bad_content
             ):
                 spider_instance.state = sm_models.SpiderInstanceProcessState.BAD_CONTENT
-                spider_instance.save()
-                return
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
-                spider_instance.save()
-                return
+            spider_instance.save()
         except Exception as ex:
             spider_instance.state = sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
             spider_instance.exception_message = str(ex)
             spider_instance.save()
-            return
-"""
+            raise ex
