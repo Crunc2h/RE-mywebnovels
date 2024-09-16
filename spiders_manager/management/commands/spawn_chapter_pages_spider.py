@@ -2,11 +2,10 @@ import links_manager.models as lm_models
 import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 import spiders_manager.native.spawners as spawners
+from django.core.management.base import BaseCommand
 from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
 )
-from django.core.management.base import BaseCommand
-from django.core.exceptions import ObjectDoesNotExist
 
 
 class Command(BaseCommand):
@@ -23,7 +22,7 @@ class Command(BaseCommand):
         )
 
         spider_instance = sm_models.SpiderInstanceProcess.objects.get(
-            identifier=options["novel_link"][0]
+            identifier=novel_link_object.link
         )
         spider_instance.state = sm_models.SpiderInstanceProcessState.IN_PROGRESS
         spider_instance.save()
@@ -47,14 +46,13 @@ class Command(BaseCommand):
                 )
                 spider_instance.exception_message = str(ex)
                 spider_instance.save()
-                raise ex
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
                 spawners.spawn_chapter_pages_spider(
                     website.name, novel_link_object.link
                 )
-                return
+            return
         try:
             new_chapters, bad_pages = website_interface.process_chapter_pages(
                 novel_object=novel_link_object.novel,
@@ -76,7 +74,6 @@ class Command(BaseCommand):
                 spawners.spawn_chapter_pages_spider(
                     website.name, novel_link_object.link
                 )
-                return
             elif (
                 len(bad_pages) > 0
                 and spider_instance.current_processor_retry_on_bad_content
@@ -90,4 +87,3 @@ class Command(BaseCommand):
             spider_instance.state = sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
             spider_instance.exception_message = str(ex)
             spider_instance.save()
-            raise ex

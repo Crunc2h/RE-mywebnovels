@@ -1,15 +1,15 @@
-import links_manager.models as lm_models
 import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 import spiders_manager.native.spawners as spawners
-from time import sleep
+from datetime import datetime, timezone
 from django.core.management.base import BaseCommand
+from time import sleep
 from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
 )
-from datetime import datetime, timezone
-
-NOVEL_UPDATE_CYCLE_REFRESH_TIME = 0.1
+from spiders_manager.management.commands.start_website_update import (
+    NOVEL_UPDATE_CYCLE_REFRESH_TIME,
+)
 
 
 class Command(BaseCommand):

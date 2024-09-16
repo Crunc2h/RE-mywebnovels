@@ -1,11 +1,10 @@
-import links_manager.models as lm_models
 import novels_storage.models as ns_models
 import spiders_manager.models as sm_models
+import spiders_manager.native.spawners as spawners
+from django.core.management.base import BaseCommand
 from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
 )
-from spiders_manager.native.spawners import spawn_novel_links_spider
-from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
@@ -18,7 +17,7 @@ class Command(BaseCommand):
         website_interface = WebsiteInterface(website.name)
 
         spider_instance = sm_models.SpiderInstanceProcess.objects.get(
-            identifier=options["website_name"][0]
+            identifier=website.name
         )
         spider_instance.state = sm_models.SpiderInstanceProcessState.IN_PROGRESS
         spider_instance.save()
@@ -30,7 +29,6 @@ class Command(BaseCommand):
             )
         except Exception as ex:
             spider_instance.current_scraper_grace_period += 1
-            spider_instance.save()
             if (
                 spider_instance.current_scraper_grace_period
                 >= spider_instance.maximum_scraper_grace_period
@@ -40,27 +38,32 @@ class Command(BaseCommand):
                 )
                 spider_instance.exception_message = str(ex)
                 spider_instance.save()
-                raise ex
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
-                spawn_novel_links_spider(website.name)
+                spawners.spawn_novel_links_spider(website.name)
+            return
         try:
-            new_novel_links, bad_pages = website_interface.process_novel_link_pages(
-                website.link_object,
-                website.novel_link_pages_directory,
+            new_novel_link_objects, bad_pages = (
+                website_interface.process_novel_link_pages(
+                    website.link_object,
+                    website.novel_link_pages_directory,
+                )
             )
-            for new_novel_link in new_novel_links:
-                if not website.link_object.novel_link_exists(new_novel_link.link):
-                    new_novel_link.save()
+            for new_novel_link_object in new_novel_link_objects:
+                if not website.link_object.novel_link_exists(
+                    new_novel_link_object.link
+                ):
+                    new_novel_link_object.save()
             if (
                 len(bad_pages) > 0
                 and spider_instance.current_processor_retry_on_bad_content
                 < spider_instance.max_processor_retry_on_bad_content
             ):
                 spider_instance.current_processor_retry_on_bad_content += 1
+                spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
-                spawn_novel_links_spider(website.name)
+                spawners.spawn_novel_links_spider(website.name)
             elif (
                 len(bad_pages) > 0
                 and spider_instance.current_processor_retry_on_bad_content
@@ -75,4 +78,3 @@ class Command(BaseCommand):
             spider_instance.state = sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
             spider_instance.exception_message = str(ex)
             spider_instance.save()
-            raise ex

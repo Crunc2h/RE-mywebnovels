@@ -25,6 +25,7 @@ class NovelLink(models.Model):
     )
     link = models.CharField(max_length=8096)
     name = models.CharField(max_length=1024)
+    selected_for_update = models.BooleanField(default=False)
 
     def chapter_link_exists(self, chapter_link):
         return chapter_link in [

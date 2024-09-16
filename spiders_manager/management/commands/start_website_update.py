@@ -8,6 +8,9 @@ from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
 )
 
+WEBSITE_UPDATE_CYCLE_REFRESH_TIME = 0.5
+NOVEL_UPDATE_CYCLE_REFRESH_TIME = 0.1
+
 
 class Command(BaseCommand):
 
@@ -59,7 +62,7 @@ class Command(BaseCommand):
 
         website = ns_models.Website.objects.get(name=options["website_name"][0])
         website_interface = WebsiteInterface(website.name)
-        """
+
         spider_instance = sm_models.SpiderInstanceProcess(
             website_update_instance=website_update_instance, identifier=website.name
         )
@@ -67,23 +70,25 @@ class Command(BaseCommand):
 
         spawners.spawn_novel_links_spider(website.name)
         while True:
+            sleep(NOVEL_UPDATE_CYCLE_REFRESH_TIME)
             spider_instance = sm_models.SpiderInstanceProcess.objects.get(
                 identifier=website.name
             )
             if (
                 spider_instance.state
-                == sm_models.SpiderInstanceProcessState.IN_PROGRESS
-                or spider_instance.state == sm_models.SpiderInstanceProcessState.IDLE
+                == sm_models.SpiderInstanceProcessState.SCRAPER_ERROR
+                or spider_instance.state
+                == sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
+                or spider_instance.state
+                == sm_models.SpiderInstanceProcessState.BAD_CONTENT
             ):
-                sleep(0.2)
-                continue
-            elif spider_instance.state == sm_models.SpiderInstanceProcessState.FINISHED:
-                spider_instance.delete()
-                break
-            else:
-                print(spider_instance.state)
+                print(spider_instance.exception_message)
                 print(spider_instance.bad_content_page_paths)
-                raise Exception(spider_instance.exception_message)
+                return
+            elif spider_instance.state == sm_models.SpiderInstanceProcessState.FINISHED:
+                spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
+                spider_instance.save()
+                break
 
         novel_link_objects = website.link_object.novel_links.all()
 
@@ -94,34 +99,15 @@ class Command(BaseCommand):
             if matching_novel != None:
                 novel_link_object.novel = matching_novel
                 novel_link_object.save()
+                matching_novel.save()
 
         links_updatable = [
             novel_link.link
             for novel_link in novel_link_objects
             if novel_link.novel is None or novel_link.novel.is_updatable()
         ]
-        """
-        # test_links = [
-        #    "https://www.webnovelpub.pro/novel/a-depressed-kendo-player-possesses-a-bastard-aristocrat",
-        #    "https://www.webnovelpub.pro/novel/i-became-the-necromancer-of-the-academy",
-        #    "https://www.webnovelpub.pro/novel/the-narrow-eyed-villain-of-the-demon-academy",
-        #    "https://www.webnovelpub.pro/novel/i-became-an-immortal-on-mortal-realm",
-        #    "https://www.webnovelpub.pro/novel/the-mirror-legacy",
-        # ]
-        test_links = [
-            "https://www.webnovelpub.pro/novel/i-became-the-necromancer-of-the-academy"
-        ]
-
-        for link in test_links:
-            t = lm_models.NovelLink(
-                website_link=website_link_object,
-                link=link,
-                name=website_interface.get_novel_name_from_url(link),
-            )
-            t.save()
-        links_updatable = [obj.link for obj in website.link_object.novel_links.all()]
-        print(links_updatable)
-
+        links_updatable = links_updatable[0:50]
+        errors = []
         while True:
             website_update_instance = sm_models.WebsiteUpdateInstance.objects.get(
                 website=website
@@ -133,16 +119,38 @@ class Command(BaseCommand):
                     == sm_models.SpiderInstanceProcessState.COMPLETE
                 ):
                     spider_instance.delete()
-
-            if len(links_updatable) == 0:
+                elif (
+                    spider_instance.state
+                    == sm_models.SpiderInstanceProcessState.BAD_CONTENT
+                    or spider_instance.state
+                    == sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
+                    or spider_instance.state
+                    == sm_models.SpiderInstanceProcessState.SCRAPER_ERROR
+                ):
+                    error = (
+                        spider_instance.exception_message,
+                        spider_instance.bad_content_page_paths,
+                    )
+                    if error not in errors:
+                        errors.append(error)
+            if (
+                len(links_updatable) == 0
+                or len(errors) > 0
+                and website_update_instance.spider_processes.filter(
+                    state=sm_models.SpiderInstanceProcessState.IN_PROGRESS
+                ).count()
+                == 0
+            ):
                 break
             if (
                 website_update_instance.spider_processes.count()
-                < website_update_instance.maximum_processes
+                <= website_update_instance.maximum_processes
+                and len(errors) == 0
             ):
                 print("spawning proc")
                 updatable_link = links_updatable.pop()
-                print(updatable_link)
                 spawners.start_novel_update(website.name, updatable_link)
-                break
-            sleep(0.2)
+            sleep(WEBSITE_UPDATE_CYCLE_REFRESH_TIME)
+
+        for error in errors:
+            print(error)

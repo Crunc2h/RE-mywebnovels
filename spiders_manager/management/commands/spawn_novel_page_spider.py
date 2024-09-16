@@ -1,12 +1,11 @@
-import links_manager.models as lm_models
 import novels_storage.models as ns_models
 import spiders_manager.models as sm_models
 import spiders_manager.native.spawners as spawners
+from django.core.management.base import BaseCommand
 from sc_bots.sc_bots.spiders.novel_page_spider import NOVEL_PAGE_FORMAT, FILE_FORMAT
 from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
 )
-from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
@@ -25,7 +24,7 @@ class Command(BaseCommand):
         novel = novel_link_object.novel
 
         spider_instance = sm_models.SpiderInstanceProcess.objects.get(
-            identifier=options["novel_link"][0]
+            identifier=novel_link_object.link
         )
         spider_instance.state = sm_models.SpiderInstanceProcessState.IN_PROGRESS
         spider_instance.save()
@@ -52,49 +51,43 @@ class Command(BaseCommand):
                 spawners.spawn_novel_page_spider(website.name, novel_link_object.link)
             return
         try:
-            novel, m2m_data = website_interface.process_novel_page(
+            new_novel, m2m_data = website_interface.process_novel_page(
                 novel_directory=novel.novel_directory,
                 novel_page_format=NOVEL_PAGE_FORMAT,
                 file_format=FILE_FORMAT,
             )
             if (
-                novel is None
+                new_novel is None
                 and spider_instance.current_processor_retry_on_bad_content
                 < spider_instance.max_processor_retry_on_bad_content
             ):
                 spider_instance.current_processor_retry_on_bad_content += 1
+                spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
                 spawners.spawn_novel_page_spider(website.name, novel_link_object.link)
-                return
             elif (
-                novel is None
+                new_novel is None
                 and spider_instance.current_processor_retry_on_bad_content
                 >= spider_instance.max_processor_retry_on_bad_content
             ):
                 spider_instance.state = sm_models.SpiderInstanceProcessState.BAD_CONTENT
-                spider_instance.save()
-                return
             else:
-                matching_existing_novel = ns_models.dbwide_get_novel_of_name(
-                    novel_name=novel.name
-                )
-                if not matching_existing_novel.initialized:
+                if not novel.initialized:
                     for category in m2m_data["categories"]:
-                        matching_existing_novel.categories.add(category)
+                        novel.categories.add(category)
                     for tag in m2m_data["tags"]:
-                        matching_existing_novel.tags.add(tag)
-                    matching_existing_novel.author = novel.author
-                    matching_existing_novel.language = novel.language
-                    matching_existing_novel.completion_status = novel.completion_status
-                    matching_existing_novel.summary = novel.summary
-                    matching_existing_novel.initialized = True
+                        novel.tags.add(tag)
+                    novel.author = new_novel.author
+                    novel.language = new_novel.language
+                    novel.completion_status = new_novel.completion_status
+                    novel.summary = new_novel.summary
+                    novel.initialized = True
                 else:
-                    matching_existing_novel.completion_status = novel.completion_status
-                    matching_existing_novel.summary = novel.summary
-
-                matching_existing_novel.save()
+                    novel.completion_status = new_novel.completion_status
+                    novel.summary = new_novel.summary
+                novel.save()
                 spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
-                spider_instance.save()
+            spider_instance.save()
         except Exception as ex:
             spider_instance.state = sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
             spider_instance.exception_message = str(ex)
