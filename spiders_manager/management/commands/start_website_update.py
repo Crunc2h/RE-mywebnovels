@@ -61,16 +61,23 @@ class Command(BaseCommand):
         # sm_models.SpiderInstanceProcess.objects.all().delete()
 
         website = ns_models.Website.objects.get(name=options["website_name"][0])
-        website_interface = WebsiteInterface(website.name)
-
+        website_interface = WebsiteInterface(
+            website.name, f"{website.name.upper()}_UPDATE"
+        )
         spider_instance = sm_models.SpiderInstanceProcess(
             website_update_instance=website_update_instance, identifier=website.name
         )
         spider_instance.save()
+        import os
 
         spawners.spawn_novel_links_spider(website.name)
         while True:
             sleep(NOVEL_UPDATE_CYCLE_REFRESH_TIME)
+            website_update_instance = sm_models.WebsiteUpdateInstance.objects.get(
+                website=website
+            )
+            os.system("clear")
+            print(website_update_instance)
             spider_instance = sm_models.SpiderInstanceProcess.objects.get(
                 identifier=website.name
             )
@@ -86,8 +93,7 @@ class Command(BaseCommand):
                 print(spider_instance.bad_content_page_paths)
                 return
             elif spider_instance.state == sm_models.SpiderInstanceProcessState.FINISHED:
-                spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
-                spider_instance.save()
+                spider_instance.delete()
                 break
 
         novel_link_objects = website.link_object.novel_links.all()
@@ -112,6 +118,8 @@ class Command(BaseCommand):
             website_update_instance = sm_models.WebsiteUpdateInstance.objects.get(
                 website=website
             )
+            os.system("clear")
+            print(website_update_instance)
 
             for spider_instance in website_update_instance.spider_processes.all():
                 if (

@@ -6,12 +6,14 @@
 #     https://docs.scrapy.org/en/latest/topics/settings.html
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
+import logging
 
+# Disable logging for Scrapy
+logging.getLogger("scrapy").setLevel(logging.CRITICAL)
 BOT_NAME = "sc_bots"
 
 SPIDER_MODULES = ["sc_bots.spiders"]
 NEWSPIDER_MODULE = "sc_bots.spiders"
-
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 # USER_AGENT = "sc_bots (+http://www.yourdomain.com)"

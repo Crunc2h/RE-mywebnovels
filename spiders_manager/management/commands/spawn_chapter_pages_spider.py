@@ -2,6 +2,7 @@ import links_manager.models as lm_models
 import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 import spiders_manager.native.spawners as spawners
+import spiders_manager.native.website_abstraction.process_signals as signals
 from django.core.management.base import BaseCommand
 from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
@@ -16,7 +17,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         website = ns_models.Website.objects.get(name=options["website_name"][0])
-        website_interface = WebsiteInterface(website.name)
+        website_interface = WebsiteInterface(
+            website.name, "SPIDER_PROCESS::CHAPTER_PAGES"
+        )
         novel_link_object = lm_models.NovelLink.objects.get(
             link=options["novel_link"][0]
         )
@@ -37,6 +40,7 @@ class Command(BaseCommand):
             )
         except Exception as ex:
             spider_instance.current_scraper_grace_period += 1
+            signals.scraper_error.send(sender=None, instance=website.update_instance)
             if (
                 spider_instance.current_scraper_grace_period
                 >= spider_instance.maximum_scraper_grace_period
@@ -46,6 +50,9 @@ class Command(BaseCommand):
                 )
                 spider_instance.exception_message = str(ex)
                 spider_instance.save()
+                signals.critical_error.send(
+                    sender=None, instance=website.update_instance
+                )
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.IDLE
                 spider_instance.save()
@@ -63,13 +70,18 @@ class Command(BaseCommand):
                     is None
                 ):
                     new_chapter.save()
-
+                    signals.new_chapters_added.send(
+                        sender=None, instance=website.update_instance
+                    )
             if (
                 len(bad_pages) > 0
                 and spider_instance.current_processor_retry_on_bad_content
                 < spider_instance.max_processor_retry_on_bad_content
             ):
                 spider_instance.current_processor_retry_on_bad_content += 1
+                signals.bad_content_error.send(
+                    sender=None, instance=website.update_instance
+                )
                 spider_instance.save()
                 spawners.spawn_chapter_pages_spider(
                     website.name, novel_link_object.link
@@ -80,10 +92,14 @@ class Command(BaseCommand):
                 >= spider_instance.max_processor_retry_on_bad_content
             ):
                 spider_instance.state = sm_models.SpiderInstanceProcessState.BAD_CONTENT
+                signals.critical_error.send(
+                    sender=None, instance=website.update_instance
+                )
             else:
                 spider_instance.state = sm_models.SpiderInstanceProcessState.FINISHED
             spider_instance.save()
         except Exception as ex:
+            signals.critical_error.send(sender=None, instance=website.update_instance)
             spider_instance.state = sm_models.SpiderInstanceProcessState.PROCESSOR_ERROR
             spider_instance.exception_message = str(ex)
             spider_instance.save()
