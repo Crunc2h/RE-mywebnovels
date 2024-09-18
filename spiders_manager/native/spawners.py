@@ -1,6 +1,6 @@
 import os
 
-
+"""
 def spawn_novel_links_spider(website_name):
     os.system(
         "gnome-terminal -- "
@@ -41,3 +41,4 @@ def start_website_update(website_name, max_allowed_processes):
         "gnome-terminal -- "
         + f"bash -c 'source .re_venv/bin/activate; python3 manage.py start_website_update '{website_name}' {max_allowed_processes}; exec bash'"
     )
+"""
