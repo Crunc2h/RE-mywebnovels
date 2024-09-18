@@ -9,7 +9,10 @@ from bs4 import BeautifulSoup
 from scrapy.crawler import CrawlerProcess
 from sc_bots.sc_bots.spiders.novel_link_pages_spider import NovelLinkPagesSpider
 from sc_bots.sc_bots.spiders.chapter_link_pages_spider import ChapterLinkPagesSpider
-from sc_bots.sc_bots.spiders.novel_pages_spider import NovelPagesSpider
+from sc_bots.sc_bots.spiders.novel_pages_spider import (
+    NovelPagesSpider,
+    NOVEL_PAGE_FORMAT,
+)
 from sc_bots.sc_bots.spiders.chapter_pages_spider import ChapterPagesSpider
 
 
@@ -117,15 +120,25 @@ class WebsiteInterface:
                     new_chapters.append(new_chapter)
         return new_chapters, bad_pages
 
-    def process_novel_page(self, novel_name, file_path):
-        self.cout.broadcast(
-            style="init", message="Beginning to process a novel page..."
-        )
-        self.cout.broadcast(style="progress", message=f"Processing {file_path}...")
-        with open(file_path, "r") as file:
-            soup = BeautifulSoup(file, "lxml")
-            novel = self.novel_page_processor(soup, novel_name)
-            return novel
+    def process_novel_pages(self, novel_objects, bad_pages=[]):
+        self.cout.broadcast(style="init", message="Beginning to process novel pages...")
+
+        new_novels = []
+        bad_pages = []
+
+        for novel_object in novel_objects:
+            file_path = novel_object.novel_directory + NOVEL_PAGE_FORMAT.format(
+                file_format="html"
+            )
+            self.cout.broadcast(style="progress", message=f"Processing {file_path}...")
+            with open(file_path, "r") as file:
+                soup = BeautifulSoup(file, "lxml")
+                new_novel, m2m_data = self.novel_page_processor(soup, novel_object.name)
+                if new_novel is None:
+                    bad_pages.append(file_path)
+                else:
+                    new_novels.append((new_novel, m2m_data))
+        return new_novels, bad_pages
 
     def get_novel_links(self, novel_link_pages_dir, crawler_start_link):
         self.cout.broadcast(

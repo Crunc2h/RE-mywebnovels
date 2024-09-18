@@ -37,8 +37,7 @@ class Command(BaseCommand):
             shell=True,
         )
 
-        novel_link_objects_present = website.link_object.novel_links.all()
-        [print(n.link) for n in novel_link_objects_present]
+        novel_link_objects_present = list(website.link_object.novel_links.all())
 
         max_processes = options["max_allowed_processes"][0]
         novel_page_url_batches = []
@@ -97,7 +96,6 @@ class Command(BaseCommand):
             ]
             for url in batch:
                 args.append(url)
-            print(args)
             procs.append(subprocess.Popen(args=args))
 
         for novel_pages_process in procs:

@@ -12,7 +12,6 @@ CHAPTER_LINK_PAGES_FORMAT = "/chapter_links_page-{current_page}.{file_format}"
 class ChapterLinkPagesSpider(scrapy.Spider):
     name = "chapter_link_pages_spider"
     start_urls = []
-    download_delay = 0.25
     custom_settings = {"USER_AGENT": UA.chrome}
     chapter_link_page_numbers_used = []
 

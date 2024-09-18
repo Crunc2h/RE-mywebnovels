@@ -17,23 +17,25 @@ def novel_link_page_processor(
             if not common.check_is_all_alpha(
                 common.get_novel_slug(link_element["href"]).split("-")[-1]
             ):
-                slug = [
-                    common.get_novel_slug(link_element["href"]).split("-")[i]
-                    for i in range(
-                        0, len(common.get_novel_slug(link_element["href"]).split("-"))
-                    )
-                    if i
-                    != len(common.get_novel_slug(link_element["href"]).split("-")) - 1
-                ]
-                stub = common.get_novel_stub(link_element["href"])
-                href = stub + "-".join(slug)
+                slug = "-".join(
+                    [
+                        common.get_novel_slug(link_element["href"]).split("-")[i]
+                        for i in range(
+                            0,
+                            len(common.get_novel_slug(link_element["href"]).split("-")),
+                        )
+                        if i
+                        != len(common.get_novel_slug(link_element["href"]).split("-"))
+                        - 1
+                    ]
+                )
             else:
-                href = link_element["href"]
+                slug = common.get_novel_slug(link_element["href"])
             novel_links_in_page.append(
                 lm_models.NovelLink(
                     website_link=website_link_object,
-                    link=website_link_object.base_link + href,
-                    name=get_novel_name_from_url(href),
+                    link=website_link_object.base_link + link_element["href"],
+                    name=slug,
                 )
             )
         else:

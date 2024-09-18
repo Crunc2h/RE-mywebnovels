@@ -34,22 +34,27 @@ class Command(BaseCommand):
 
         website_interface.get_novel_pages(novel_page_urls_to_novel_directories)
 
-        for novel_link_object in novel_link_objects:
-            novel, m2m = website_interface.process_novel_page(
-                novel_name=novel_link_object.name,
-                file_path=novel_link_object.novel.novel_directory
-                + NOVEL_PAGE_FORMAT.format(file_format="html"),
-            )
-            if not novel_link_object.novel.initialized:
+        new_novels, bad_pages = website_interface.process_novel_pages(
+            novel_objects=[
+                novel_link_object.novel for novel_link_object in novel_link_objects
+            ]
+        )
+        for new_novel, m2m in new_novels:
+            matching_novel_object = website.link_object.novel_links.get(
+                name=new_novel.name
+            ).novel
+            if not matching_novel_object.initialized:
                 for category in m2m["categories"]:
-                    novel_link_object.novel.categories.add(category)
+                    matching_novel_object.categories.add(category)
                 for tag in m2m["tags"]:
-                    novel_link_object.novel.tags.add(tag)
-                novel_link_object.novel.author = novel.author
-                novel_link_object.novel.completion_status = novel.completion_status
-                novel_link_object.novel.summary = novel.summary
-                novel_link_object.novel.initialized = True
+                    matching_novel_object.tags.add(tag)
+                    matching_novel_object.author = new_novel.author
+                    matching_novel_object.completion_status = (
+                        new_novel.completion_status
+                    )
+                    matching_novel_object.summary = new_novel.summary
+                    matching_novel_object.initialized = True
             else:
-                novel_link_object.novel.completion_status = novel.completion_status
-                novel_link_object.novel.summary = novel.summary
-            novel_link_object.novel.save()
+                matching_novel_object.completion_status = new_novel.completion_status
+                matching_novel_object.summary = new_novel.summary
+            matching_novel_object.save()

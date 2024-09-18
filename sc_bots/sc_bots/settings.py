@@ -9,7 +9,6 @@
 import logging
 
 # Disable logging for Scrapy
-logging.getLogger("scrapy").setLevel(logging.CRITICAL)
 BOT_NAME = "sc_bots"
 
 SPIDER_MODULES = ["sc_bots.spiders"]
