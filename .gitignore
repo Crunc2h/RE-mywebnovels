@@ -3,4 +3,5 @@
 *.gitignore
 *.sqlite3
 __pycache__/
+migrations/
 .re_venv/
