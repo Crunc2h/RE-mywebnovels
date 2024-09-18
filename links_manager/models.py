@@ -15,17 +15,25 @@ class WebsiteLink(models.Model):
     def novel_link_exists(self, novel_link):
         return novel_link in [novel_link.link for novel_link in self.novel_links.all()]
 
+    def get_novel_link_object_from_url(self, novel_link):
+        if self.novel_links.filter(link=novel_link).count() > 0:
+            return self.novel_links.get(link=novel_link)
+        return None
+
 
 class NovelLink(models.Model):
     website_link = models.ForeignKey(
         WebsiteLink, on_delete=models.CASCADE, related_name="novel_links"
     )
-    novel = models.ForeignKey(
-        ns_models.Novel, on_delete=models.CASCADE, related_name="links", null=True
+    novel = models.OneToOneField(
+        ns_models.Novel,
+        on_delete=models.CASCADE,
+        related_name="link",
+        blank=True,
+        null=True,
     )
     link = models.CharField(max_length=8096)
     name = models.CharField(max_length=1024)
-    selected_for_update = models.BooleanField(default=False)
 
     def chapter_link_exists(self, chapter_link):
         return chapter_link in [

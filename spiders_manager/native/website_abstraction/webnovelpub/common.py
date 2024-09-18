@@ -22,9 +22,21 @@ def get_chapter_number_from_title(title):
     return standardize_str(title.split("Chapter ")[1].split(":")[0])
 
 
+def get_novel_slug(url):
+    return standardize_str(url.split("novel/")[1])
+
+
+def get_novel_stub(url):
+    return url.split("novel/")[0] + "novel/"
+
+
 def get_novel_name_from_slug(slug_name):
-    return " ".join(slug_name.split("-"))
+    return standardize_str(" ".join(slug_name.split("-")))
 
 
 def get_novel_name_from_url(url):
-    return standardize_str(get_novel_name_from_slug(url.split("novel/")[1]))
+    return standardize_str(get_novel_name_from_slug(get_novel_slug(url)))
+
+
+def check_is_all_alpha(str):
+    return len(list(filter(lambda letter: letter.isalpha(), str))) == len(str)

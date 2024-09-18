@@ -14,11 +14,26 @@ def novel_link_page_processor(
     for novel_item in soup.find_all(class_="novel-item"):
         link_element = novel_item.find("a")
         if link_element != None:
+            if not common.check_is_all_alpha(
+                common.get_novel_slug(link_element["href"]).split("-")[-1]
+            ):
+                slug = [
+                    common.get_novel_slug(link_element["href"]).split("-")[i]
+                    for i in range(
+                        0, len(common.get_novel_slug(link_element["href"]).split("-"))
+                    )
+                    if i
+                    != len(common.get_novel_slug(link_element["href"]).split("-")) - 1
+                ]
+                stub = common.get_novel_stub(link_element["href"])
+                href = stub + "-".join(slug)
+            else:
+                href = link_element["href"]
             novel_links_in_page.append(
                 lm_models.NovelLink(
                     website_link=website_link_object,
-                    link=website_link_object.base_link + link_element["href"],
-                    name=get_novel_name_from_url(link_element["href"]),
+                    link=website_link_object.base_link + href,
+                    name=get_novel_name_from_url(href),
                 )
             )
         else:
@@ -87,8 +102,7 @@ def chapter_page_processor(
     return None
 
 
-def novel_page_processor(soup):
-    name_element = soup.select_one(".novel-title")
+def novel_page_processor(soup, novel_name):
     author_element = soup.select_one("a.property-item:nth-child(2) > span:nth-child(1)")
     summary_element = soup.select_one("div.content")
     completion_status_element = soup.select_one(".completed")
@@ -98,14 +112,13 @@ def novel_page_processor(soup):
     tags_element = soup.select_one(".tags")
 
     if (
-        name_element
-        and author_element
+        author_element
         and summary_element
         and completion_status_element
         and categories_element
         and tags_element
     ):
-        name = standardize_str(name_element.text)
+        name = novel_name
         author = ns_models.get_or_create_enum_model_from_str(
             standardize_str(author_element.text),
             ns_models.NovelAuthor,
@@ -143,6 +156,5 @@ def novel_page_processor(soup):
             "categories": categories,
             "tags": tags,
         }
-
         return new_novel, m2m
     return None

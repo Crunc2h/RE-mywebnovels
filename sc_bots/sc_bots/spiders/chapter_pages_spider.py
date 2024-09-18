@@ -13,7 +13,7 @@ class ChapterPagesSpider(scrapy.Spider):
     name = "chapter_pages_spider"
     start_urls = []
     custom_settings = {"USER_AGENT": UA.chrome}
-    download_delay = 0.5
+    download_delay = 0.25
     chapter_page_numbers_used = []
 
     def __init__(

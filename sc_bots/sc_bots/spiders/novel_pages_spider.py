@@ -8,15 +8,16 @@ FILE_FORMAT = "html"
 NOVEL_PAGE_FORMAT = "/novel_page.{file_format}"
 
 
-class NovelPageSpider(scrapy.Spider):
-    name = "novel_page_spider"
+class NovelPagesSpider(scrapy.Spider):
+    name = "novel_pages_spider"
     start_urls = []
+    download_delay = 0.25
     custom_settings = {"USER_AGENT": UA.chrome}
 
     def __init__(self, novel_page_urls_to_novel_directories, *args, **kwargs):
         self.novel_page_urls_to_novel_directories = novel_page_urls_to_novel_directories
         self.start_urls.extend(list(novel_page_urls_to_novel_directories.keys()))
-        self.cout = cout.ConsoleOut(header="SC_BOTS::NOVEL_PAGE_SPIDER")
+        self.cout = cout.ConsoleOut(header="SC_BOTS::NOVEL_PAGES_SPIDER")
         super().__init__(*args, **kwargs)
         self.cout.broadcast(style="success", message="Successfully initialized.")
 
@@ -24,7 +25,6 @@ class NovelPageSpider(scrapy.Spider):
         current_novel_directory = self.novel_page_urls_to_novel_directories[
             response.url
         ]
-
         self.cout.broadcast(
             style="progress",
             message=f"<{response.status}> Crawling {response.url}...",

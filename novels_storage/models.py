@@ -133,7 +133,7 @@ Author: {self.author.name}\n\
 Completion Status: {self.completion_status.name}\n\
 Initialized: {self.initialized}\n\
 Is Being Updated: {self.is_being_updated}\n\
-Links: {[link_object.link for link_object in self.links.all()]}\n\
+Link: {'None' if not hasattr(self, 'link') else self.link}\n\
 Chapters: {self.chapters.count()}\n\
 Categories --> {[category.name for category in self.categories.all()]}\n\
 Tags --> {[tag.name for tag in self.tags.all()]}"
@@ -166,9 +166,6 @@ Tags --> {[tag.name for tag in self.tags.all()]}"
     def is_updatable(self):
         if self.is_being_updated:
             return False
-        for link in self.links:
-            if link.selected_for_update:
-                return False
         if not self.initialized or self.chapters.count() == 0:
             return True
         return (
