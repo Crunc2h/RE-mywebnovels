@@ -35,6 +35,11 @@ class ChapterLinkPagesSpider(scrapy.Spider):
         super().__init__(*args, **kwargs)
         self.cout.broadcast(style="success", message="Successfully initialized.")
 
+    def start_requests(self):
+        super().start_requests()
+        for url in self.start_urls:
+            yield scrapy.Request(url, self.parse)
+
     def parse(self, response):
         if response.url in self.start_urls:
             self.current_novel_page_url = response.url

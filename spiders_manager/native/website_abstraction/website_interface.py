@@ -64,60 +64,57 @@ class WebsiteInterface:
         return new_novel_links, bad_pages
 
     def process_chapter_link_pages(
-        self, novel_link_object, chapter_link_pages_directory, bad_pages=[]
+        self, novel_link_objects_to_chapter_link_pages_directories
     ):
         self.cout.broadcast(
             style="init", message="Beginning to process chapter link pages..."
         )
-        if len(bad_pages) > 0:
-            chapter_link_pages = bad_pages
-        else:
-            chapter_link_pages = os.listdir(chapter_link_pages_directory)
 
         new_chapter_links = []
         bad_pages = []
 
-        for chapter_link_page in chapter_link_pages:
-            file_path = chapter_link_pages_directory + "/" + chapter_link_page
-            self.cout.broadcast(style="progress", message=f"Processing {file_path}...")
-            with open(file_path, "r") as file:
-                soup = BeautifulSoup(file, "lxml")
-                chapter_links_in_page, bad_content_in_page = (
-                    self.chapter_link_page_processor(soup, novel_link_object)
+        for (
+            novel_link_object,
+            chapter_link_pages_directory,
+        ) in novel_link_objects_to_chapter_link_pages_directories.items():
+            chapter_link_pages = os.listdir(chapter_link_pages_directory)
+            for chapter_link_page in chapter_link_pages:
+                file_path = chapter_link_pages_directory + "/" + chapter_link_page
+                self.cout.broadcast(
+                    style="progress", message=f"Processing {file_path}..."
                 )
-                signals.chapter_link_page_processed.send(
-                    sender=None, instance=self.website_update_instance
-                )
-                if bad_content_in_page and file_path not in bad_pages:
-                    bad_pages.append(file_path)
-                new_chapter_links.extend(chapter_links_in_page)
+                with open(file_path, "r") as file:
+                    soup = BeautifulSoup(file, "lxml")
+                    chapter_links_in_page, bad_content_in_page = (
+                        self.chapter_link_page_processor(soup, novel_link_object)
+                    )
+                    if bad_content_in_page and file_path not in bad_pages:
+                        bad_pages.append(file_path)
+                    new_chapter_links.extend(chapter_links_in_page)
         return new_chapter_links, bad_pages
 
-    def process_chapter_pages(self, novel_object, bad_pages=[]):
+    def process_chapter_pages(self, novel_objects):
         self.cout.broadcast(
             style="init", message="Beginning to process chapter pages..."
         )
-        if len(bad_pages) > 0:
-            chapter_pages = bad_pages
-        else:
-            chapter_pages = os.listdir(novel_object.chapter_pages_directory)
 
         new_chapters = []
         bad_pages = []
 
-        for chapter_page in chapter_pages:
-            file_path = novel_object.chapter_pages_directory + "/" + chapter_page
-            self.cout.broadcast(style="progress", message=f"Processing {file_path}...")
-            with open(file_path, "r") as file:
-                soup = BeautifulSoup(file, "lxml")
-                new_chapter = self.chapter_page_processor(soup, novel_object)
-                signals.chapter_page_processed.send(
-                    sender=None, instance=self.website_update_instance
+        for novel_object in novel_objects:
+            chapter_pages = os.listdir(novel_object.chapter_pages_directory)
+            for chapter_page in chapter_pages:
+                file_path = novel_object.chapter_pages_directory + "/" + chapter_page
+                self.cout.broadcast(
+                    style="progress", message=f"Processing {file_path}..."
                 )
-                if new_chapter is None:
-                    bad_pages.append(file_path)
-                else:
-                    new_chapters.append(new_chapter)
+                with open(file_path, "r") as file:
+                    soup = BeautifulSoup(file, "lxml")
+                    new_chapter = self.chapter_page_processor(soup, novel_object)
+                    if new_chapter is None:
+                        bad_pages.append(file_path)
+                    else:
+                        new_chapters.append(new_chapter)
         return new_chapters, bad_pages
 
     def process_novel_pages(self, novel_objects, bad_pages=[]):
@@ -165,7 +162,6 @@ class WebsiteInterface:
             novel_page_urls_to_chapter_link_page_directories=novel_page_urls_to_chapter_link_page_directories,
             get_chapters_index_page=self.get_chapters_index_page,
             get_next_page=self.get_next_page,
-            get_max_page=self.get_max_page,
         )
         process.start()
 

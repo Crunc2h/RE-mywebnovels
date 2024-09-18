@@ -1,4 +1,4 @@
-import links_manager.models as lm_models
+import subprocess
 import novels_storage.models as ns_models
 from sc_bots.sc_bots.spiders.novel_pages_spider import NOVEL_PAGE_FORMAT
 from django.core.management.base import BaseCommand
@@ -58,3 +58,15 @@ class Command(BaseCommand):
                 matching_novel_object.completion_status = new_novel.completion_status
                 matching_novel_object.summary = new_novel.summary
             matching_novel_object.save()
+
+        args = [
+            "python3",
+            "manage.py",
+            "open_chapter_link_pages_process",
+            f"{website.name}",
+        ]
+        args.extend(novel_page_urls)
+
+        chapter_link_pages_process = subprocess.run(
+            args=args,
+        )

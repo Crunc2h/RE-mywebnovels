@@ -61,31 +61,7 @@ class Command(BaseCommand):
                         for novel_link_object in novel_link_objects_present[last_step::]
                     ]
                 )
-        """
-        urls = [
-            "https://www.webnovelpub.pro/novel/a-depressed-kendo-player-possesses-a-bastard-aristocrat",
-            "https://www.webnovelpub.pro/novel/i-became-the-necromancer-of-the-academy",
-        ]
 
-        from spiders_manager.native.website_abstraction.website_interface import (
-            WebsiteInterface,
-        )
-
-        test_wi = WebsiteInterface(website.name, caller="urmom")
-        for url in urls:
-            a = lm_models.NovelLink(
-                name=test_wi.get_novel_name_from_url(url),
-                link=url,
-                website_link=website.link_object,
-            )
-            a.save()
-        novel_page_url_batches = [
-            [
-                "https://www.webnovelpub.pro/novel/a-depressed-kendo-player-possesses-a-bastard-aristocrat",
-                "https://www.webnovelpub.pro/novel/i-became-the-necromancer-of-the-academy",
-            ]
-        ]
-        """
         procs = []
         for batch in novel_page_url_batches:
             args = [
@@ -94,8 +70,7 @@ class Command(BaseCommand):
                 "open_novel_pages_process",
                 f"{website.name}",
             ]
-            for url in batch:
-                args.append(url)
+            args.extend(batch)
             procs.append(subprocess.Popen(args=args))
 
         for novel_pages_process in procs:
