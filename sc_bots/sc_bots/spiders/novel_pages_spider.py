@@ -1,6 +1,8 @@
-from typing import Iterable
 import scrapy
 import cout.native.console as cout
+import spiders_manager.models as sm_models
+import novels_storage.models as ns_models
+from typing import Iterable
 from pathlib import Path
 from fake_useragent import UserAgent
 
@@ -15,7 +17,25 @@ class NovelPagesSpider(scrapy.Spider):
     custom_settings = {"USER_AGENT": UA.chrome}
     download_delay = 0.5
 
-    def __init__(self, novel_page_urls_to_novel_directories, *args, **kwargs):
+    def __init__(
+        self,
+        process_id,
+        website_name,
+        novel_page_urls_to_novel_directories,
+        *args,
+        **kwargs,
+    ):
+        self.process_id = process_id
+        self.website_name = website_name
+
+        self.update_process_instance = ns_models.Website.objects.get(
+            name=self.website_name
+        ).update_instance.process_instances.get(process_id=self.process_id)
+        self.spider_instance = sm_models.UpdateSpiderInstance(
+            update_process_instance=self.update_process_instance
+        )
+        self.spider_instance.save()
+
         self.novel_page_urls_to_novel_directories = novel_page_urls_to_novel_directories
         self.start_urls.extend(list(novel_page_urls_to_novel_directories.keys()))
         self.cout = cout.ConsoleOut(header="SC_BOTS::NOVEL_PAGES_SPIDER")
@@ -38,3 +58,6 @@ class NovelPagesSpider(scrapy.Spider):
         Path(
             current_novel_directory + NOVEL_PAGE_FORMAT.format(file_format=FILE_FORMAT)
         ).write_bytes(response.body)
+
+        self.spider_instance.novel_pages_scraped += 1
+        self.spider_instance.save()

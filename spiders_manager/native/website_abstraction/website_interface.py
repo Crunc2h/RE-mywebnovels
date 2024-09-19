@@ -1,10 +1,9 @@
+import os
 import novels_storage.models as ns_models
 import cout.native.console as cout
+import spiders_manager.models as sm_models
 import spiders_manager.native.website_abstraction.webnovelpub.common as webnovelpub_common
 import spiders_manager.native.website_abstraction.webnovelpub.processors as webnovelpub_processors
-import spiders_manager.native.website_abstraction.process_signals as signals
-import os
-from cout.native.common import standardize_str
 from bs4 import BeautifulSoup
 from scrapy.crawler import CrawlerProcess
 from sc_bots.sc_bots.spiders.novel_link_pages_spider import NovelLinkPagesSpider
@@ -17,9 +16,21 @@ from sc_bots.sc_bots.spiders.chapter_pages_spider import ChapterPagesSpider
 
 
 class WebsiteInterface:
-    def __init__(self, website_name, caller) -> None:
+    def __init__(self, process_id, website_name, caller) -> None:
+        self.process_id = process_id
+        self.website_name = website_name
+
+        self.update_process_instance = ns_models.Website.objects.get(
+            name=self.website_name
+        ).update_instance.process_instances.get(process_id=self.process_id)
+        self.processor_instance = sm_models.UpdateProcessorInstance(
+            update_process_instance=self.update_process_instance
+        )
+        self.processor_instance.save()
+
         self.cout = cout.ConsoleOut(header=f"{caller}::WEBSITE_INTERFACE")
         self.cout.broadcast(style="success", message="Successfully initialized.")
+
         if website_name == "webnovelpub":
             self.novel_link_page_processor = (
                 webnovelpub_processors.novel_link_page_processor
@@ -37,16 +48,12 @@ class WebsiteInterface:
         self,
         website_link_object,
         novel_link_pages_directory,
-        bad_pages=[],
     ):
         self.cout.broadcast(
             style="init", message="Beginning to process novel link pages..."
         )
-        if len(bad_pages) > 0:
-            novel_link_pages = bad_pages
-        else:
-            novel_link_pages = os.listdir(novel_link_pages_directory)
 
+        novel_link_pages = os.listdir(novel_link_pages_directory)
         new_novel_links = []
         bad_pages = []
 
@@ -61,6 +68,8 @@ class WebsiteInterface:
                 if bad_content_in_page and file_path not in bad_pages:
                     bad_pages.append(file_path)
                 new_novel_links.extend(novel_links_in_page)
+            self.processor_instance.novel_link_pages_processed += 1
+            self.processor_instance.save()
         return new_novel_links, bad_pages
 
     def process_chapter_link_pages(
@@ -91,6 +100,8 @@ class WebsiteInterface:
                     if bad_content_in_page and file_path not in bad_pages:
                         bad_pages.append(file_path)
                     new_chapter_links.extend(chapter_links_in_page)
+                self.processor_instance.chapter_link_pages_processed += 1
+                self.processor_instance.save()
         return new_chapter_links, bad_pages
 
     def process_chapter_pages(self, novel_objects):
@@ -115,6 +126,8 @@ class WebsiteInterface:
                         bad_pages.append(file_path)
                     else:
                         new_chapters.append(new_chapter)
+                self.processor_instance.chapter_pages_processed += 1
+                self.processor_instance.save()
         return new_chapters, bad_pages
 
     def process_novel_pages(self, novel_objects, bad_pages=[]):
@@ -135,6 +148,8 @@ class WebsiteInterface:
                     bad_pages.append(file_path)
                 else:
                     new_novels.append((new_novel, m2m_data))
+            self.processor_instance.novel_pages_processed += 1
+            self.processor_instance.save()
         return new_novels, bad_pages
 
     def get_novel_links(self, novel_link_pages_dir, crawler_start_link):
@@ -145,6 +160,8 @@ class WebsiteInterface:
         crawler_process.settings["LOG_ENABLED"] = False
         crawler_process.crawl(
             NovelLinkPagesSpider,
+            process_id=self.process_id,
+            website_name=self.website_name,
             novel_link_pages_directory=novel_link_pages_dir,
             website_crawler_start_url=crawler_start_link,
             get_next_page=self.get_next_page,
@@ -159,6 +176,8 @@ class WebsiteInterface:
         process.settings["LOG_ENABLED"] = False
         process.crawl(
             ChapterLinkPagesSpider,
+            process_id=self.process_id,
+            website_name=self.website_name,
             novel_page_urls_to_chapter_link_page_directories=novel_page_urls_to_chapter_link_page_directories,
             get_chapters_index_page=self.get_chapters_index_page,
             get_next_page=self.get_next_page,
@@ -171,6 +190,8 @@ class WebsiteInterface:
         process.settings["LOG_ENABLED"] = False
         process.crawl(
             NovelPagesSpider,
+            process_id=self.process_id,
+            website_name=self.website_name,
             novel_page_urls_to_novel_directories=novel_page_urls_to_novel_directories,
         )
         process.start()
@@ -183,6 +204,8 @@ class WebsiteInterface:
         process.settings["LOG_ENABLED"] = False
         process.crawl(
             ChapterPagesSpider,
+            process_id=self.process_id,
+            website_name=self.website_name,
             chapter_urls_to_chapter_page_directories=chapter_urls_to_chapter_page_directories,
         )
         process.start()

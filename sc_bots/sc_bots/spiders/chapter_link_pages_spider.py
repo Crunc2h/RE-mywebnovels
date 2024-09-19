@@ -1,5 +1,7 @@
 import scrapy
 import random
+import spiders_manager.models as sm_models
+import novels_storage.models as ns_models
 import cout.native.console as cout
 from pathlib import Path
 from fake_useragent import UserAgent
@@ -17,12 +19,25 @@ class ChapterLinkPagesSpider(scrapy.Spider):
 
     def __init__(
         self,
+        process_id,
+        website_name,
         novel_page_urls_to_chapter_link_page_directories,
         get_chapters_index_page,
         get_next_page,
         *args,
         **kwargs,
     ):
+        self.process_id = process_id
+        self.website_name = website_name
+
+        self.update_process_instance = ns_models.Website.objects.get(
+            name=self.website_name
+        ).update_instance.process_instances.get(process_id=self.process_id)
+        self.spider_instance = sm_models.UpdateSpiderInstance(
+            update_process_instance=self.update_process_instance
+        )
+        self.spider_instance.save()
+
         self.get_chapters_index_page = get_chapters_index_page
         self.get_next_page = get_next_page
         self.novel_page_urls_to_chapter_link_page_directories = (
@@ -70,6 +85,9 @@ class ChapterLinkPagesSpider(scrapy.Spider):
                     current_page=rand_chapter_link_page_number, file_format=FILE_FORMAT
                 )
             ).write_bytes(response.body)
+
+            self.spider_instance.chapter_link_pages_scraped += 1
+            self.spider_instance.save()
 
             next_page = self.get_next_page(response)
             if not next_page:

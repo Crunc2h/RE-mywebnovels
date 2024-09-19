@@ -1,6 +1,6 @@
 import subprocess
 import novels_storage.models as ns_models
-from sc_bots.sc_bots.spiders.novel_pages_spider import NOVEL_PAGE_FORMAT
+import spiders_manager.models as sm_models
 from django.core.management.base import BaseCommand
 from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
@@ -15,14 +15,23 @@ NOVEL_UPDATE_CYCLE_REFRESH_TIME = 0.1
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        parser.add_argument("process_id", type=int)
         parser.add_argument("website_name", type=str)
         parser.add_argument("novel_page_urls", nargs="+", type=str)
 
-    def handle(self, website_name, novel_page_urls, *args, **options):
+    def handle(self, process_id, website_name, novel_page_urls, *args, **options):
         website = ns_models.Website.objects.get(name=website_name)
         website_interface = WebsiteInterface(
-            website.name, caller=f"WEBSITE_UPDATE::{website.name.upper()}"
+            process_id, website.name, caller=f"WEBSITE_UPDATE::{website.name.upper()}"
         )
+
+        update_process_instance = website.update_instance.process_instances.get(
+            process_id=process_id
+        )
+
+        update_process_instance.process_phase = sm_models.ProcessPhases.INITIALIZING
+        update_process_instance.save()
+
         novel_link_objects = [
             website.link_object.get_novel_link_object_from_url(novel_page_url)
             for novel_page_url in novel_page_urls
@@ -33,9 +42,19 @@ class Command(BaseCommand):
                 novel_link_object.novel.chapter_link_pages_directory
             )
 
+        update_process_instance.process_phase = (
+            sm_models.ProcessPhases.SCRAPING_CHAPTER_LINK_PAGES
+        )
+        update_process_instance.save()
+
         website_interface.get_chapter_links(
             novel_page_urls_to_chapter_link_page_directories=novel_page_urls_to_chapter_link_page_directories
         )
+
+        update_process_instance.process_phase = (
+            sm_models.ProcessPhases.PROCESSING_CHAPTER_LINK_PAGES
+        )
+        update_process_instance.save()
 
         novel_link_objects_to_chapter_link_pages_directories = {}
         for novel_link_object in novel_link_objects:
@@ -49,6 +68,11 @@ class Command(BaseCommand):
             )
         )
 
+        update_process_instance.process_phase = (
+            sm_models.ProcessPhases.FILTERING_CHAPTER_LINK_DATA
+        )
+        update_process_instance.save()
+
         for chapter_link_object in new_chapter_link_objects:
             if not chapter_link_object.novel_link.chapter_link_exists(
                 chapter_link_object.link
@@ -60,11 +84,17 @@ class Command(BaseCommand):
                     is None
                 ):
                     chapter_link_object.save()
+                    update_process_instance.chapter_links_added += 1
+                    update_process_instance.save()
+
+        update_process_instance.process_phase = sm_models.ProcessPhases.IDLE
+        update_process_instance.save()
 
         args = [
             "python3",
             "manage.py",
             "open_chapter_pages_process",
+            f"{process_id}",
             f"{website.name}",
         ]
         args.extend(novel_page_urls)
