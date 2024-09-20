@@ -21,4 +21,4 @@ class Command(BaseCommand):
             )
             os.system("clear")
             print(website_update_instance)
-            sleep(2)
+            sleep(1)

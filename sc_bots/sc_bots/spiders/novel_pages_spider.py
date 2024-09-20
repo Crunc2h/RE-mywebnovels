@@ -45,7 +45,7 @@ class NovelPagesSpider(scrapy.Spider):
     def start_requests(self) -> Iterable[scrapy.Request]:
         super().start_requests()
         for url in self.start_urls:
-            yield scrapy.Request(url, self.parse)
+            yield scrapy.Request(url, self.parse, dont_filter=True)
 
     def parse(self, response):
         current_novel_directory = self.novel_page_urls_to_novel_directories[

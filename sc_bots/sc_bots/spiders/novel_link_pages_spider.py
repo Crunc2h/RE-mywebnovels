@@ -13,8 +13,9 @@ NOVEL_LINKS_PAGE_FORMAT = "/novel_links_page-{current_page}.{file_format}"
 class NovelLinkPagesSpider(scrapy.Spider):
     name = "novel_link_pages_spider"
     start_urls = []
-    current_page = 0
     custom_settings = {"USER_AGENT": UA.chrome}
+    download_delay = 0.5
+    max_page = None
 
     def __init__(
         self,
@@ -23,15 +24,18 @@ class NovelLinkPagesSpider(scrapy.Spider):
         novel_link_pages_directory,
         website_crawler_start_url,
         get_next_page,
+        get_max_page,
         *args,
         **kwargs,
     ):
         self.process_id = process_id
         self.website_name = website_name
-
-        self.update_process_instance = ns_models.Website.objects.get(
-            name=self.website_name
-        ).update_instance.process_instances.get(process_id=self.process_id)
+        self.website = ns_models.Website.objects.get(name=self.website_name)
+        self.update_process_instance = (
+            self.website.update_instance.process_instances.get(
+                process_id=self.process_id
+            )
+        )
         self.spider_instance = sm_models.UpdateSpiderInstance(
             update_process_instance=self.update_process_instance
         )
@@ -39,6 +43,7 @@ class NovelLinkPagesSpider(scrapy.Spider):
 
         self.novel_link_pages_directory = novel_link_pages_directory
         self.get_next_page = get_next_page
+        self.get_max_page = get_max_page
         self.cout = cout.ConsoleOut(header="SC_BOTS::NOVEL_LINK_PAGES_SPIDER")
         self.start_urls.append(website_crawler_start_url)
         super().__init__(*args, **kwargs)
@@ -50,22 +55,34 @@ class NovelLinkPagesSpider(scrapy.Spider):
             message=f"<{response.status}> Crawling {response.url}...",
         )
 
+        if self.max_page is None:
+            self.max_page = self.get_max_page(
+                response, self.website.link_object.base_link
+            )
+            if self.max_page is None:
+                raise Exception("NO MAX PAGE")
+
         Path(
             self.novel_link_pages_directory
             + NOVEL_LINKS_PAGE_FORMAT.format(
-                current_page=self.current_page, file_format=FILE_FORMAT
+                current_page=self.spider_instance.novel_link_pages_scraped,
+                file_format=FILE_FORMAT,
             )
         ).write_bytes(response.body)
 
         self.spider_instance.novel_link_pages_scraped += 1
         self.spider_instance.save()
 
-        self.current_page += 1
-        next_page = self.get_next_page(response)
+        next_page = self.get_next_page(response, self.website.link_object.base_link)
         if not next_page:
-            self.cout.broadcast(
-                style="success",
-                message=f"Crawling of novel link pages is complete.",
-            )
+            if self.max_page == response.url:
+                self.cout.broadcast(
+                    style="success",
+                    message=f"Crawling of novel link pages from {self.start_urls[0]}",
+                )
+                return
+            print(self.max_page)
+            print(response.url)
+            raise Exception("Didnt scrape the whole content!!!")
         else:
-            yield response.follow(next_page, self.parse)
+            return scrapy.Request(next_page, self.parse, dont_filter=True)

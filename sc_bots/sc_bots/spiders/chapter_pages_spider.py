@@ -45,6 +45,11 @@ class ChapterPagesSpider(scrapy.Spider):
         super().__init__(*args, **kwargs)
         self.cout.broadcast(style="success", message="Successfully initialized.")
 
+    def start_requests(self):
+        super().start_requests()
+        for url in self.start_urls:
+            yield scrapy.Request(url, self.parse, dont_filter=True)
+
     def parse(self, response):
         current_chapter_pages_directory = self.chapter_urls_to_chapter_page_directories[
             response.url
@@ -54,15 +59,11 @@ class ChapterPagesSpider(scrapy.Spider):
             message=f"<{response.status}> Crawling {response.url}...",
         )
 
-        rand_chapter_page_number = random.randint(0, 60000)
-        while rand_chapter_page_number in self.chapter_page_numbers_used:
-            rand_chapter_page_number = random.randint(0, 60000)
-        self.chapter_page_numbers_used.append(rand_chapter_page_number)
-
         Path(
             current_chapter_pages_directory
             + CHAPTER_PAGES_FORMAT.format(
-                current_chapter=rand_chapter_page_number, file_format=FILE_FORMAT
+                current_chapter=self.spider_instance.chapter_link_pages_scraped,
+                file_format=FILE_FORMAT,
             )
         ).write_bytes(response.body)
 

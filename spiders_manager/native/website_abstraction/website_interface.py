@@ -41,6 +41,7 @@ class WebsiteInterface:
             self.novel_page_processor = webnovelpub_processors.novel_page_processor
             self.chapter_page_processor = webnovelpub_processors.chapter_page_processor
             self.get_next_page = webnovelpub_common.get_next_page
+            self.get_max_page = webnovelpub_common.get_max_page
             self.get_chapters_index_page = webnovelpub_common.get_chapters_index_page
             self.get_novel_name_from_url = webnovelpub_common.get_novel_name_from_url
 
@@ -67,6 +68,7 @@ class WebsiteInterface:
                 )
                 if bad_content_in_page and file_path not in bad_pages:
                     bad_pages.append(file_path)
+
                 new_novel_links.extend(novel_links_in_page)
             self.processor_instance.novel_link_pages_processed += 1
             self.processor_instance.save()
@@ -157,7 +159,7 @@ class WebsiteInterface:
             style="init", message="Starting the novel link pages spider..."
         )
         crawler_process = CrawlerProcess()
-        crawler_process.settings["LOG_ENABLED"] = False
+        crawler_process.settings["LOG_ENABLED"] = True
         crawler_process.crawl(
             NovelLinkPagesSpider,
             process_id=self.process_id,
@@ -165,6 +167,7 @@ class WebsiteInterface:
             novel_link_pages_directory=novel_link_pages_dir,
             website_crawler_start_url=crawler_start_link,
             get_next_page=self.get_next_page,
+            get_max_page=self.get_max_page,
         )
         crawler_process.start()
 
@@ -173,7 +176,7 @@ class WebsiteInterface:
             style="init", message="Starting the chapter link pages spider..."
         )
         process = CrawlerProcess()
-        process.settings["LOG_ENABLED"] = False
+        process.settings["LOG_ENABLED"] = True
         process.crawl(
             ChapterLinkPagesSpider,
             process_id=self.process_id,
@@ -181,13 +184,14 @@ class WebsiteInterface:
             novel_page_urls_to_chapter_link_page_directories=novel_page_urls_to_chapter_link_page_directories,
             get_chapters_index_page=self.get_chapters_index_page,
             get_next_page=self.get_next_page,
+            get_max_page=self.get_max_page,
         )
         process.start()
 
     def get_novel_pages(self, novel_page_urls_to_novel_directories):
         self.cout.broadcast(style="init", message="Starting the novel page spider...")
         process = CrawlerProcess()
-        process.settings["LOG_ENABLED"] = False
+        process.settings["LOG_ENABLED"] = True
         process.crawl(
             NovelPagesSpider,
             process_id=self.process_id,
@@ -201,7 +205,7 @@ class WebsiteInterface:
             style="init", message="Starting the chapter pages spider..."
         )
         process = CrawlerProcess()
-        process.settings["LOG_ENABLED"] = False
+        process.settings["LOG_ENABLED"] = True
         process.crawl(
             ChapterPagesSpider,
             process_id=self.process_id,

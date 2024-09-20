@@ -17,11 +17,12 @@ class Command(BaseCommand):
         parser.add_argument("max_allowed_processes", nargs="+", type=int)
 
     def handle(self, *args, **options):
+        lm_models.WebsiteLink.objects.all().delete()
         lm_models.NovelLink.objects.all().delete()
         lm_models.ChapterLink.objects.all().delete()
         ns_models.Website.objects.all().delete()
-        ns_models.Chapter.objects.all().delete()
         ns_models.Novel.objects.all().delete()
+        ns_models.Chapter.objects.all().delete()
         sm_models.WebsiteUpdateInstance.objects.all().delete()
         sm_models.UpdateProcessInstance.objects.all().delete()
         sm_models.UpdateProcessorInstance.objects.all().delete()
