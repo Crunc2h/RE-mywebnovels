@@ -48,9 +48,11 @@ class ChapterLinkPagesSpider(scrapy.Spider):
             novel_page_urls_to_chapter_link_page_directories
         )
         self.cout = cout.ConsoleOut(header="SC_BOTS::CHAPTER_LINK_PAGES_SPIDER")
+
         self.start_urls.extend(
             list(novel_page_urls_to_chapter_link_page_directories.keys())
         )
+
         super().__init__(*args, **kwargs)
         self.cout.broadcast(style="success", message="Successfully initialized.")
 
@@ -110,13 +112,13 @@ class ChapterLinkPagesSpider(scrapy.Spider):
                 )
                 return
             ##DEBUG
-
             print(
                 f"{cout.ConsoleColors.CRED}{cout.ConsoleColors.CBOLD}++++++++++++++++++++++++++"
             )
             print(max_page)
             print(response.url)
             print(cout.ConsoleColors.CEND)
+            ##DEBUG
             raise Exception("Didnt scrape the whole content!!!")
         else:
             return scrapy.Request(

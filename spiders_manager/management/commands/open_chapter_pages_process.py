@@ -1,6 +1,7 @@
 import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 from django.core.management.base import BaseCommand
+from datetime import datetime, timezone
 from spiders_manager.native.website_abstraction.website_interface import (
     WebsiteInterface,
 )
@@ -36,7 +37,7 @@ class Command(BaseCommand):
         ]
         chapter_urls_to_chapter_page_directories = {}
         for novel_link_object in novel_link_objects:
-            for chapter_link_object in novel_link_object.chapter_links.all():
+            for chapter_link_object in novel_link_object.chapter_link_objects.all():
                 chapter_urls_to_chapter_page_directories[chapter_link_object.link] = (
                     novel_link_object.novel.chapter_pages_directory
                 )
@@ -61,21 +62,33 @@ class Command(BaseCommand):
                 novel_link_object.novel.chapter_link_pages_directory
             )
 
-        new_chapters, bad_pages = website_interface.process_chapter_pages(
-            novel_objects=[
-                novel_link_object.novel for novel_link_object in novel_link_objects
-            ]
+        matching_novel_and_chapters, bad_pages = (
+            website_interface.process_chapter_pages(
+                novel_objects=[
+                    novel_link_object.novel for novel_link_object in novel_link_objects
+                ]
+            )
         )
+        novels = []
+        new_chapters = []
+        for novel, chapters in matching_novel_and_chapters:
+            novel.last_updated = datetime.now(timezone.utc)
+            novel.is_being_updated = False
+            novels.append(novel)
+            new_chapters.extend(chapters)
 
         update_process_instance.process_phase = (
-            sm_models.ProcessPhases.FILTERING_CHAPTER_DATA
+            sm_models.ProcessPhases.FILTERING_CHAPTER_LINK_DATA
         )
+        update_process_instance.bad_content_found = len(bad_pages)
+        if update_process_instance.bad_content_found > 0:
+            update_process_instance.bad_content_file_paths = "\n".join(bad_pages)
         update_process_instance.save()
 
-        for new_chapter in new_chapters:
-            new_chapter.save()
-            update_process_instance.chapters_added += 1
-            update_process_instance.save()
+        ns_models.Novel.objects.bulk_update(
+            novels, ["last_updated", "is_being_updated"]
+        )
+        ns_models.Chapter.objects.bulk_create(new_chapters)
 
         update_process_instance.process_phase = sm_models.ProcessPhases.FINISHED
         update_process_instance.save()

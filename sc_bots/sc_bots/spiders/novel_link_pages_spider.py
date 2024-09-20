@@ -72,8 +72,7 @@ class NovelLinkPagesSpider(scrapy.Spider):
 
         self.spider_instance.novel_link_pages_scraped += 1
         self.spider_instance.save()
-        ##DEBUG
-        return
+
         next_page = self.get_next_page(response, self.website.link_object.base_link)
         if not next_page:
             if self.max_page == response.url:

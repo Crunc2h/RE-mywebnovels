@@ -70,9 +70,7 @@ class WebsiteInterface:
                 if bad_content_in_page and file_path not in bad_pages:
                     bad_pages.append(file_path)
 
-                ###DEBUG
-                # new_novel_link_object_dicts.extend(novel_object_link_dicts_in_page)
-                new_novel_link_object_dicts.append(novel_object_link_dicts_in_page[0])
+                new_novel_link_object_dicts.extend(novel_object_link_dicts_in_page)
 
         self.processor_instance.novel_link_pages_processed = len(novel_link_pages)
         self.processor_instance.save()
@@ -127,12 +125,12 @@ class WebsiteInterface:
         self.cout.broadcast(
             style="init", message="Beginning to process chapter pages..."
         )
-
-        new_chapters = []
+        matching_novel_and_chapters = []
         bad_pages = []
-        novel_pages_processed = 0
+        chapter_pages_processed = 0
         for novel_object in novel_objects:
             chapter_pages = os.listdir(novel_object.chapter_pages_directory)
+            new_chapters_of_novel = []
             for chapter_page in chapter_pages:
                 file_path = novel_object.chapter_pages_directory + "/" + chapter_page
                 self.cout.broadcast(
@@ -144,10 +142,12 @@ class WebsiteInterface:
                     if new_chapter is None:
                         bad_pages.append(file_path)
                     else:
-                        new_chapters.append(new_chapter)
-                self.processor_instance.chapter_pages_processed += 1
-                self.processor_instance.save()
-        return new_chapters, bad_pages
+                        new_chapters_of_novel.append(new_chapter)
+            matching_novel_and_chapters.append((novel_object, new_chapters_of_novel))
+            chapter_pages_processed += len(chapter_pages)
+        self.processor_instance.chapter_pages_processed = chapter_pages_processed
+        self.processor_instance.save()
+        return matching_novel_and_chapters, bad_pages
 
     def process_novel_pages(self, novel_objects, bad_pages=[]):
         self.cout.broadcast(style="init", message="Beginning to process novel pages...")

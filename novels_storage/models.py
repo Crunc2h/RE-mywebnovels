@@ -125,6 +125,7 @@ class Novel(models.Model):
     )
     chapter_pages_directory = models.CharField(max_length=2048, blank=True, null=True)
     initialized = models.BooleanField(default=False)
+    last_updated = models.DateTimeField(auto_now=True)
     is_being_updated = models.BooleanField(default=False)
 
     def __str__(self) -> str:
@@ -133,7 +134,7 @@ Author: {self.author.name}\n\
 Completion Status: {self.completion_status.name}\n\
 Initialized: {self.initialized}\n\
 Is Being Updated: {self.is_being_updated}\n\
-Link: {'None' if not hasattr(self, 'link') else self.link}\n\
+Link: {'None' if not hasattr(self, 'link_object') else self.link_object.link}\n\
 Chapters: {self.chapters.count()}\n\
 Categories --> {[category.name for category in self.categories.all()]}\n\
 Tags --> {[tag.name for tag in self.tags.all()]}"
