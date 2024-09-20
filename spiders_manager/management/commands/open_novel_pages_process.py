@@ -54,10 +54,12 @@ class Command(BaseCommand):
         )
         update_process_instance.save()
 
-        new_novels, bad_pages = website_interface.process_novel_pages(
-            novel_objects=[
-                novel_link_object.novel for novel_link_object in novel_link_objects
-            ]
+        matching_novels_and_novel_object_dicts, bad_pages = (
+            website_interface.process_novel_pages(
+                novel_objects=[
+                    novel_link_object.novel for novel_link_object in novel_link_objects
+                ]
+            )
         )
 
         update_process_instance.process_phase = (
@@ -65,30 +67,52 @@ class Command(BaseCommand):
         )
         update_process_instance.save()
 
-        for new_novel, m2m in new_novels:
-            matching_novel_object = website.link_object.novel_links.get(
-                name=new_novel.name
-            ).novel
-            if not matching_novel_object.initialized:
-                for category in m2m["categories"]:
-                    matching_novel_object.categories.add(category)
-                for tag in m2m["tags"]:
-                    matching_novel_object.tags.add(tag)
-                    matching_novel_object.author = new_novel.author
-                    matching_novel_object.completion_status = (
-                        new_novel.completion_status
+        old_novels_updated = 0
+        new_novels_added = 0
+
+        for novel, novel_object_dict in matching_novels_and_novel_object_dicts:
+            if not novel.initialized:
+                novel_object_dict["categories"] = [
+                    ns_models.get_or_create_enum_model_from_str(
+                        category, ns_models.NovelCategory
                     )
-                    matching_novel_object.summary = new_novel.summary
-                    matching_novel_object.initialized = True
-
-                update_process_instance.new_novels_added += 1
+                    for category in novel_object_dict["categories"]
+                ]
+                novel_object_dict["tags"] = [
+                    ns_models.get_or_create_enum_model_from_str(tag, ns_models.NovelTag)
+                    for tag in novel_object_dict["tags"]
+                ]
+                novel.categories.add(*novel_object_dict["categories"])
+                novel.tags.add(*novel_object_dict["tags"])
+                novel.author = ns_models.get_or_create_enum_model_from_str(
+                    novel_object_dict["author"], ns_models.NovelAuthor
+                )
+                novel.completion_status = ns_models.get_or_create_enum_model_from_str(
+                    novel_object_dict["completion_status"],
+                    ns_models.NovelCompletionStatus,
+                )
+                novel.summary = novel_object_dict["summary"]
+                novel.initialized = True
+                new_novels_added += 1
             else:
-                matching_novel_object.completion_status = new_novel.completion_status
-                matching_novel_object.summary = new_novel.summary
+                novel.completion_status = ns_models.get_or_create_enum_model_from_str(
+                    novel_object_dict["completion_status"],
+                    ns_models.NovelCompletionStatus,
+                )
+                novel.summary = novel_object_dict["summary"]
+                old_novels_updated += 1
 
-                update_process_instance.old_novels_updated += 1
-            matching_novel_object.save()
-            update_process_instance.save()
+        update_process_instance.old_novels_updated = old_novels_updated
+        update_process_instance.new_novels_added = new_novels_added
+        update_process_instance.save()
+
+        ns_models.Novel.objects.bulk_update(
+            [
+                novel
+                for novel, novel_object_dict in matching_novels_and_novel_object_dicts
+            ],
+            ["categories", "tags", "author", "completion_status", "summary"],
+        )
 
         update_process_instance.process_phase = sm_models.ProcessPhases.IDLE
         update_process_instance.save()

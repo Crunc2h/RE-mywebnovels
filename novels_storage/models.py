@@ -195,8 +195,24 @@ class Chapter(models.Model):
 
 def dbwide_get_novel_of_name(novel_name):
     novel_name = standardize_str(novel_name)
-    for website in Website.objects.all():
-        matching_novels = website.novels.filter(name=novel_name)
-        if len(matching_novels) > 0:
-            return matching_novels.first()
+    matching_novels = Novel.objects.filter(name=novel_name)
+    if len(matching_novels) > 0:
+        return matching_novels.first()
     return None
+
+
+def bulk_dbwide_get_novels_of_name_by_nldicts(new_novel_link_object_dicts):
+    all = Novel.objects.all()
+    novel_names = [novel.name for novel in all]
+    existing_links = []
+    new_links = []
+    for novel_link_object_dict in new_novel_link_object_dicts:
+        if novel_link_object_dict["name"] in novel_names:
+            existing_links.append(novel_link_object_dict)
+        else:
+            new_links.append(novel_link_object_dict)
+    matching_novels_and_dicts = [
+        (all.get(name=novel_link_object_dict["name"]), novel_link_object_dict)
+        for novel_link_object_dict in existing_links
+    ]
+    return matching_novels_and_dicts, new_links

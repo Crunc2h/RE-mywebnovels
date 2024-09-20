@@ -47,7 +47,7 @@ class WebsiteInterface:
 
     def process_novel_link_pages(
         self,
-        website_link_object,
+        website_base_link,
         novel_link_pages_directory,
     ):
         self.cout.broadcast(
@@ -55,24 +55,27 @@ class WebsiteInterface:
         )
 
         novel_link_pages = os.listdir(novel_link_pages_directory)
-        new_novel_links = []
+        new_novel_link_object_dicts = []
         bad_pages = []
 
         for novel_link_page in novel_link_pages:
             file_path = novel_link_pages_directory + "/" + novel_link_page
             self.cout.broadcast(style="progress", message=f"Processing {file_path}...")
+
             with open(file_path, "r") as file:
                 soup = BeautifulSoup(file, "lxml")
-                novel_links_in_page, bad_content_in_page = (
-                    self.novel_link_page_processor(soup, website_link_object)
+                novel_object_link_dicts_in_page, bad_content_in_page = (
+                    self.novel_link_page_processor(soup, website_base_link)
                 )
                 if bad_content_in_page and file_path not in bad_pages:
                     bad_pages.append(file_path)
 
-                new_novel_links.extend(novel_links_in_page)
-            self.processor_instance.novel_link_pages_processed += 1
-            self.processor_instance.save()
-        return new_novel_links, bad_pages
+                new_novel_link_object_dicts.extend(novel_object_link_dicts_in_page)
+
+        self.processor_instance.novel_link_pages_processed = len(novel_link_pages)
+        self.processor_instance.save()
+
+        return new_novel_link_object_dicts, bad_pages
 
     def process_chapter_link_pages(
         self, novel_link_objects_to_chapter_link_pages_directories
@@ -113,7 +116,7 @@ class WebsiteInterface:
 
         new_chapters = []
         bad_pages = []
-
+        novel_pages_processed = 0
         for novel_object in novel_objects:
             chapter_pages = os.listdir(novel_object.chapter_pages_directory)
             for chapter_page in chapter_pages:
@@ -135,7 +138,7 @@ class WebsiteInterface:
     def process_novel_pages(self, novel_objects, bad_pages=[]):
         self.cout.broadcast(style="init", message="Beginning to process novel pages...")
 
-        new_novels = []
+        matching_novels_and_novel_object_dicts = []
         bad_pages = []
 
         for novel_object in novel_objects:
@@ -143,16 +146,23 @@ class WebsiteInterface:
                 file_format="html"
             )
             self.cout.broadcast(style="progress", message=f"Processing {file_path}...")
+
             with open(file_path, "r") as file:
                 soup = BeautifulSoup(file, "lxml")
-                new_novel, m2m_data = self.novel_page_processor(soup, novel_object.name)
-                if new_novel is None:
+                new_novel_object_dict = self.novel_page_processor(
+                    soup, novel_object.name
+                )
+                if new_novel_object_dict is None:
                     bad_pages.append(file_path)
                 else:
-                    new_novels.append((new_novel, m2m_data))
-            self.processor_instance.novel_pages_processed += 1
-            self.processor_instance.save()
-        return new_novels, bad_pages
+                    matching_novels_and_novel_object_dicts.append(
+                        (novel_object, new_novel_object_dict)
+                    )
+
+        self.processor_instance.novel_pages_processed = len(novel_objects)
+        self.processor_instance.save()
+
+        return matching_novels_and_novel_object_dicts, bad_pages
 
     def get_novel_links(self, novel_link_pages_dir, crawler_start_link):
         self.cout.broadcast(

@@ -110,6 +110,7 @@ class UpdateProcessInstance(models.Model):
 
     scraper_errors_faced = models.IntegerField(default=0)
     bad_content_found = models.IntegerField(default=0)
+    bad_content_file_paths = models.TextField(max_length=256000, default="")
 
     t_start = models.DateTimeField(auto_now=True)
     website_update_instance = models.ForeignKey(

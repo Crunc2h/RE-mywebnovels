@@ -6,41 +6,43 @@ from datetime import datetime
 
 
 def novel_link_page_processor(
-    soup, website_link_object, get_novel_name_from_url=common.get_novel_name_from_url
+    soup,
+    website_base_link,
+    get_novel_name_from_slug=common.get_novel_name_from_slug,
+    get_novel_slug=common.get_novel_slug,
+    check_is_all_alpha=common.check_is_all_alpha,
 ):
-    novel_links_in_page = []
+    novel_link_object_dicts_in_page = []
     bad_content_in_page = False
 
     for novel_item in soup.find_all(class_="novel-item"):
         link_element = novel_item.find("a")
         if link_element != None:
-            if not common.check_is_all_alpha(
-                common.get_novel_slug(link_element["href"]).split("-")[-1]
+            if not check_is_all_alpha(
+                get_novel_slug(link_element["href"]).split("-")[-1]
             ):
                 slug = "-".join(
                     [
-                        common.get_novel_slug(link_element["href"]).split("-")[i]
+                        get_novel_slug(link_element["href"]).split("-")[i]
                         for i in range(
                             0,
-                            len(common.get_novel_slug(link_element["href"]).split("-")),
+                            len(get_novel_slug(link_element["href"]).split("-")),
                         )
-                        if i
-                        != len(common.get_novel_slug(link_element["href"]).split("-"))
-                        - 1
+                        if i != len(get_novel_slug(link_element["href"]).split("-")) - 1
                     ]
                 )
             else:
-                slug = common.get_novel_slug(link_element["href"])
-            novel_links_in_page.append(
-                lm_models.NovelLink(
-                    website_link=website_link_object,
-                    link=website_link_object.base_link + link_element["href"],
-                    name=slug,
-                )
+                slug = get_novel_slug(link_element["href"])
+
+            novel_link_object_dicts_in_page.append(
+                {
+                    "link": website_base_link + link_element["href"],
+                    "name": get_novel_name_from_slug(slug),
+                }
             )
         else:
             bad_content_in_page = True
-    return novel_links_in_page, bad_content_in_page
+    return novel_link_object_dicts_in_page, bad_content_in_page
 
 
 def chapter_link_page_processor(soup, novel_link_object):
@@ -121,42 +123,26 @@ def novel_page_processor(soup, novel_name):
         and tags_element
     ):
         name = novel_name
-        author = ns_models.get_or_create_enum_model_from_str(
-            standardize_str(author_element.text),
-            ns_models.NovelAuthor,
-        )
+        author = standardize_str(author_element.text)
         summary = "\n".join(
             [
                 paragraph.text
                 for paragraph in soup.select_one("div.content").find_all("p")
             ]
         )
-        completion_status = ns_models.get_or_create_enum_model_from_str(
-            standardize_str(completion_status_element.text),
-            ns_models.NovelCompletionStatus,
-        )
-        new_novel = ns_models.Novel(
-            name=name,
-            summary=summary,
-            author=author,
-            completion_status=completion_status,
-        )
+        completion_status = standardize_str(completion_status_element.text)
         categories = [
-            ns_models.get_or_create_enum_model_from_str(
-                standardize_str(category.text), ns_models.NovelCategory
-            )
+            standardize_str(category.text)
             for category in categories_element.find_all("li")
         ]
-        tags = [
-            ns_models.get_or_create_enum_model_from_str(
-                standardize_str(tag.text), ns_models.NovelTag
-            )
-            for tag in tags_element.find_all("li")
-        ]
-
-        m2m = {
+        tags = [standardize_str(tag.text) for tag in tags_element.find_all("li")]
+        new_novel = {
             "categories": categories,
             "tags": tags,
+            "name": name,
+            "summary": summary,
+            "author": author,
+            "completion_status": completion_status,
         }
-        return new_novel, m2m
+        return new_novel
     return None
