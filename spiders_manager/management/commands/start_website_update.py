@@ -58,7 +58,7 @@ class Command(BaseCommand):
             check=True,
         )
 
-        novel_link_objects_present = list(website.link_object.novel_links.all())
+        novel_link_objects_present = list(website.link_object.novel_link_objects.all())
 
         max_processes = options["max_allowed_processes"][0]
         novel_page_url_batches = []

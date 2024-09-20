@@ -31,13 +31,18 @@ class NovelPagesSpider(scrapy.Spider):
         self.update_process_instance = ns_models.Website.objects.get(
             name=self.website_name
         ).update_instance.process_instances.get(process_id=self.process_id)
+
         self.spider_instance = sm_models.UpdateSpiderInstance(
             update_process_instance=self.update_process_instance
         )
         self.spider_instance.save()
-
+        ##DEBUG
         self.novel_page_urls_to_novel_directories = novel_page_urls_to_novel_directories
-        self.start_urls.extend(list(novel_page_urls_to_novel_directories.keys()))
+        # self.start_urls.extend(list(self.novel_page_urls_to_novel_directories.keys()))
+        self.start_urls.append(
+            list(self.novel_page_urls_to_novel_directories.keys())[0]
+        )
+        ###
         self.cout = cout.ConsoleOut(header="SC_BOTS::NOVEL_PAGES_SPIDER")
         super().__init__(*args, **kwargs)
         self.cout.broadcast(style="success", message="Successfully initialized.")

@@ -46,22 +46,26 @@ class Command(BaseCommand):
 
         new_novel_link_object_dicts, bad_pages = (
             website_interface.process_novel_link_pages(
-                website_link_object=website.link_object,
+                website_base_link=website.link_object.base_link,
                 novel_link_pages_directory=website.novel_link_pages_directory,
             )
         )
 
         update_process_instance.process_phase = (
-            sm_models.ProcessPhases.FILTERING_NOVEL_LINK_DATA
+            sm_models.ProcessPhases.FILTERING_CHAPTER_LINK_DATA
         )
+        update_process_instance.bad_content_found = len(bad_pages)
+        if update_process_instance.bad_content_found > 0:
+            update_process_instance.bad_content_file_paths = "\n".join(bad_pages)
         update_process_instance.save()
 
         matching_novels_and_dicts, absent_novel_link_object_dicts = (
-            filter_existing_novel_links(new_novel_link_object_dicts)
+            filter_existing_novel_links(
+                new_novel_link_object_dicts, website.link_object
+            )
         )
 
         novels_to_update = []
-        novels_to_save = []
         novel_link_objects_to_save = []
         for novel, matching_novel_link_object_dict in matching_novels_and_dicts:
             novel.is_being_updated = True
@@ -79,7 +83,7 @@ class Command(BaseCommand):
                 website=website,
                 is_being_updated=True,
             )
-            novels_to_save.append(new_novel)
+            new_novel.save()
             new_novel_link_object = lm_models.NovelLink(
                 name=novel_link_object_dict["name"],
                 link=novel_link_object_dict["link"],
@@ -88,16 +92,11 @@ class Command(BaseCommand):
             )
             novel_link_objects_to_save.append(new_novel_link_object)
 
-        update_process_instance.bad_content_found = len(bad_pages)
-        update_process_instance.novel_links_added = len(novel_link_objects_to_save)
-        if update_process_instance.bad_content_found > 0:
-            update_process_instance.bad_content_file_paths = "\n".join(bad_pages)
-        update_process_instance.save()
-
         ns_models.Novel.objects.bulk_update(novels_to_update, ["is_being_updated"])
-        ns_models.Novel.objects.bulk_create(novels_to_save)
         lm_models.NovelLink.objects.bulk_create(novel_link_objects_to_save)
 
+        update_process_instance.bad_content_found = len(bad_pages)
+        update_process_instance.novel_links_added = len(novel_link_objects_to_save)
         update_process_instance.process_phase = sm_models.ProcessPhases.FINISHED
         update_process_instance.save()
 

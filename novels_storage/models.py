@@ -216,3 +216,36 @@ def bulk_dbwide_get_novels_of_name_by_nldicts(new_novel_link_object_dicts):
         for novel_link_object_dict in existing_links
     ]
     return matching_novels_and_dicts, new_links
+
+
+def bulk_dbwide_filter_chapters_of_name_by_cldicts(
+    matching_novel_and_chapter_link_object_dicts,
+):
+    converted_nl_obj_chapter_names_and_cl_obj_dicts = list(
+        map(
+            lambda matching_nl_obj_and_clo_dicts: (
+                matching_nl_obj_and_clo_dicts[0],
+                [
+                    chapter.name
+                    for chapter in matching_nl_obj_and_clo_dicts[0].novel.chapters.all()
+                ],
+                matching_nl_obj_and_clo_dicts[1],
+            ),
+            matching_novel_and_chapter_link_object_dicts,
+        )
+    )
+
+    return list(
+        map(
+            lambda converted: (
+                converted[0],
+                list(
+                    filter(
+                        lambda cl_obj_dict: cl_obj_dict["name"] not in converted[1],
+                        converted[2],
+                    )
+                ),
+            ),
+            converted_nl_obj_chapter_names_and_cl_obj_dicts,
+        )
+    )

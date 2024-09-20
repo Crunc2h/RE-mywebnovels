@@ -65,6 +65,9 @@ class Command(BaseCommand):
         update_process_instance.process_phase = (
             sm_models.ProcessPhases.FILTERING_NOVEL_DATA
         )
+        update_process_instance.bad_content_found = len(bad_pages)
+        if update_process_instance.bad_content_found > 0:
+            update_process_instance.bad_content_file_paths = "\n".join(bad_pages)
         update_process_instance.save()
 
         old_novels_updated = 0
@@ -72,6 +75,14 @@ class Command(BaseCommand):
 
         for novel, novel_object_dict in matching_novels_and_novel_object_dicts:
             if not novel.initialized:
+                novel.author = ns_models.get_or_create_enum_model_from_str(
+                    novel_object_dict["author"], ns_models.NovelAuthor
+                )
+                novel.completion_status = ns_models.get_or_create_enum_model_from_str(
+                    novel_object_dict["completion_status"],
+                    ns_models.NovelCompletionStatus,
+                )
+                novel.summary = novel_object_dict["summary"]
                 novel_object_dict["categories"] = [
                     ns_models.get_or_create_enum_model_from_str(
                         category, ns_models.NovelCategory
@@ -84,14 +95,6 @@ class Command(BaseCommand):
                 ]
                 novel.categories.add(*novel_object_dict["categories"])
                 novel.tags.add(*novel_object_dict["tags"])
-                novel.author = ns_models.get_or_create_enum_model_from_str(
-                    novel_object_dict["author"], ns_models.NovelAuthor
-                )
-                novel.completion_status = ns_models.get_or_create_enum_model_from_str(
-                    novel_object_dict["completion_status"],
-                    ns_models.NovelCompletionStatus,
-                )
-                novel.summary = novel_object_dict["summary"]
                 novel.initialized = True
                 new_novels_added += 1
             else:
@@ -102,18 +105,16 @@ class Command(BaseCommand):
                 novel.summary = novel_object_dict["summary"]
                 old_novels_updated += 1
 
-        update_process_instance.old_novels_updated = old_novels_updated
-        update_process_instance.new_novels_added = new_novels_added
-        update_process_instance.save()
-
         ns_models.Novel.objects.bulk_update(
             [
                 novel
                 for novel, novel_object_dict in matching_novels_and_novel_object_dicts
             ],
-            ["categories", "tags", "author", "completion_status", "summary"],
+            ["author", "completion_status", "summary"],
         )
 
+        update_process_instance.old_novels_updated = old_novels_updated
+        update_process_instance.new_novels_added = new_novels_added
         update_process_instance.process_phase = sm_models.ProcessPhases.IDLE
         update_process_instance.save()
 

@@ -70,7 +70,9 @@ class WebsiteInterface:
                 if bad_content_in_page and file_path not in bad_pages:
                     bad_pages.append(file_path)
 
-                new_novel_link_object_dicts.extend(novel_object_link_dicts_in_page)
+                ###DEBUG
+                # new_novel_link_object_dicts.extend(novel_object_link_dicts_in_page)
+                new_novel_link_object_dicts.append(novel_object_link_dicts_in_page[0])
 
         self.processor_instance.novel_link_pages_processed = len(novel_link_pages)
         self.processor_instance.save()
@@ -84,14 +86,15 @@ class WebsiteInterface:
             style="init", message="Beginning to process chapter link pages..."
         )
 
-        new_chapter_links = []
+        matching_novel_and_chapter_link_object_dicts = []
         bad_pages = []
-
+        chapter_link_pages_processed = 0
         for (
             novel_link_object,
             chapter_link_pages_directory,
         ) in novel_link_objects_to_chapter_link_pages_directories.items():
             chapter_link_pages = os.listdir(chapter_link_pages_directory)
+            new_chapter_link_object_dicts = []
             for chapter_link_page in chapter_link_pages:
                 file_path = chapter_link_pages_directory + "/" + chapter_link_page
                 self.cout.broadcast(
@@ -99,15 +102,26 @@ class WebsiteInterface:
                 )
                 with open(file_path, "r") as file:
                     soup = BeautifulSoup(file, "lxml")
-                    chapter_links_in_page, bad_content_in_page = (
-                        self.chapter_link_page_processor(soup, novel_link_object)
+                    chapter_link_object_dicts_in_page, bad_content_in_page = (
+                        self.chapter_link_page_processor(
+                            soup, novel_link_object.website_link_object.base_link
+                        )
                     )
-                    if bad_content_in_page and file_path not in bad_pages:
+                    new_chapter_link_object_dicts.extend(
+                        chapter_link_object_dicts_in_page
+                    )
+                    if bad_content_in_page:
                         bad_pages.append(file_path)
-                    new_chapter_links.extend(chapter_links_in_page)
-                self.processor_instance.chapter_link_pages_processed += 1
-                self.processor_instance.save()
-        return new_chapter_links, bad_pages
+            matching_novel_and_chapter_link_object_dicts.append(
+                (novel_link_object, new_chapter_link_object_dicts)
+            )
+            chapter_link_pages_processed += len(chapter_link_pages)
+
+        self.processor_instance.chapter_link_pages_processed = (
+            chapter_link_pages_processed
+        )
+        self.processor_instance.save()
+        return matching_novel_and_chapter_link_object_dicts, bad_pages
 
     def process_chapter_pages(self, novel_objects):
         self.cout.broadcast(

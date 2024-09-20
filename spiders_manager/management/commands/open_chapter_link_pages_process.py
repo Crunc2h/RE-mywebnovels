@@ -1,5 +1,6 @@
 import subprocess
 import novels_storage.models as ns_models
+import links_manager.models as lm_models
 import spiders_manager.models as sm_models
 from django.core.management.base import BaseCommand
 from spiders_manager.native.website_abstraction.website_interface import (
@@ -62,7 +63,7 @@ class Command(BaseCommand):
                 novel_link_object.novel.chapter_link_pages_directory
             )
 
-        new_chapter_link_objects, bad_pages = (
+        matching_novel_and_chapter_link_object_dicts, bad_pages = (
             website_interface.process_chapter_link_pages(
                 novel_link_objects_to_chapter_link_pages_directories=novel_link_objects_to_chapter_link_pages_directories
             )
@@ -71,22 +72,35 @@ class Command(BaseCommand):
         update_process_instance.process_phase = (
             sm_models.ProcessPhases.FILTERING_CHAPTER_LINK_DATA
         )
+        update_process_instance.bad_content_found = len(bad_pages)
+        if update_process_instance.bad_content_found > 0:
+            update_process_instance.bad_content_file_paths = "\n".join(bad_pages)
         update_process_instance.save()
 
-        for chapter_link_object in new_chapter_link_objects:
-            if not chapter_link_object.novel_link.chapter_link_exists(
-                chapter_link_object.link
-            ):
-                if (
-                    chapter_link_object.novel_link.novel.get_chapter_of_name(
-                        chapter_link_object.name
-                    )
-                    is None
-                ):
-                    chapter_link_object.save()
-                    update_process_instance.chapter_links_added += 1
-                    update_process_instance.save()
+        filtered = filter_existing_chapter_links(
+            matching_novel_and_chapter_link_object_dicts=matching_novel_and_chapter_link_object_dicts,
+            website_link_object=website.link_object,
+        )
+        chapter_link_objects_to_save = []
+        chapter_links_added = 0
 
+        for novel_link_object, chapter_link_object_dicts in filtered:
+            new_chapter_link_objects = list(
+                map(
+                    lambda cl_obj_dict: lm_models.ChapterLink(
+                        novel_link_object=novel_link_object,
+                        name=cl_obj_dict["name"],
+                        link=cl_obj_dict["link"],
+                    ),
+                    chapter_link_object_dicts,
+                )
+            )
+            chapter_link_objects_to_save.extend(new_chapter_link_objects)
+            chapter_links_added += len(new_chapter_link_objects)
+
+        lm_models.ChapterLink.objects.bulk_create(chapter_link_objects_to_save)
+
+        update_process_instance.chapter_links_added = chapter_links_added
         update_process_instance.process_phase = sm_models.ProcessPhases.IDLE
         update_process_instance.save()
 
@@ -103,7 +117,13 @@ class Command(BaseCommand):
             args=args,
         )
 
-        for novel_link_object in novel_link_objects:
-            novel_link_object.novel.last_updated = datetime.now(timezone.utc)
-            novel_link_object.novel.is_being_updated = False
-            novel_link_object.novel.save()
+
+def filter_existing_chapter_links(
+    matching_novel_and_chapter_link_object_dicts, website_link_object
+):
+    absent_nl_obj_and_cl_obj_dicts = website_link_object.bulk_get_absent_chapter_links(
+        matching_novel_and_chapter_link_object_dicts
+    )
+    return ns_models.bulk_dbwide_filter_chapters_of_name_by_cldicts(
+        absent_nl_obj_and_cl_obj_dicts
+    )

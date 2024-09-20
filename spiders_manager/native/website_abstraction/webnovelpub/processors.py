@@ -45,7 +45,7 @@ def novel_link_page_processor(
     return novel_link_object_dicts_in_page, bad_content_in_page
 
 
-def chapter_link_page_processor(soup, novel_link_object):
+def chapter_link_page_processor(soup, website_base_link):
     chapter_links_in_page = []
     bad_content_in_page = False
 
@@ -59,12 +59,10 @@ def chapter_link_page_processor(soup, novel_link_object):
         name_element = chapter_item.find(class_="chapter-title")
         if link_element != None and name_element != None:
             chapter_links_in_page.append(
-                lm_models.ChapterLink(
-                    novel_link=novel_link_object,
-                    name=standardize_str(name_element.text),
-                    link=novel_link_object.website_link.base_link
-                    + link_element["href"],
-                )
+                {
+                    "name": standardize_str(name_element.text),
+                    "link": website_base_link + link_element["href"],
+                }
             )
         else:
             bad_content_in_page = True

@@ -72,7 +72,8 @@ class NovelLinkPagesSpider(scrapy.Spider):
 
         self.spider_instance.novel_link_pages_scraped += 1
         self.spider_instance.save()
-
+        ##DEBUG
+        return
         next_page = self.get_next_page(response, self.website.link_object.base_link)
         if not next_page:
             if self.max_page == response.url:
@@ -81,8 +82,6 @@ class NovelLinkPagesSpider(scrapy.Spider):
                     message=f"Crawling of novel link pages from {self.start_urls[0]}",
                 )
                 return
-            print(self.max_page)
-            print(response.url)
             raise Exception("Didnt scrape the whole content!!!")
         else:
             return scrapy.Request(next_page, self.parse, dont_filter=True)
