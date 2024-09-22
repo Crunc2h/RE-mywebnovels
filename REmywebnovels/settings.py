@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "novels_storage",
     "cout",
     "spiders_manager",
+    "proxy_manager",
 ]
 
 MIDDLEWARE = [
