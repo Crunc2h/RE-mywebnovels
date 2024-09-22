@@ -4,9 +4,10 @@ import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 from typing import Iterable
 from pathlib import Path
+from proxy_manager.models import modify_with_proxy
 from fake_useragent import UserAgent
 
-UA = UserAgent()
+
 FILE_FORMAT = "html"
 NOVEL_PAGE_FORMAT = "/novel_page.{file_format}"
 
@@ -14,7 +15,7 @@ NOVEL_PAGE_FORMAT = "/novel_page.{file_format}"
 class NovelPagesSpider(scrapy.Spider):
     name = "novel_pages_spider"
     start_urls = []
-    custom_settings = {"USER_AGENT": UA.chrome}
+    user_agent_fetcher = UserAgent(browsers="firefox")
     download_delay = 0.5
 
     def __init__(
@@ -47,7 +48,14 @@ class NovelPagesSpider(scrapy.Spider):
     def start_requests(self) -> Iterable[scrapy.Request]:
         super().start_requests()
         for url in self.start_urls:
-            yield scrapy.Request(url, self.parse, dont_filter=True)
+            yield modify_with_proxy(
+                scrapy.Request(
+                    url,
+                    self.parse,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
+            )
 
     def parse(self, response):
         current_novel_directory = self.novel_page_urls_to_novel_directories[

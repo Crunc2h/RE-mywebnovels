@@ -27,6 +27,7 @@ CONCURRENT_REQUESTS = 16
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
 DOWNLOAD_DELAY = 0
+REDIRECT_ENABLED = False
 # The download delay setting will honor only one of:
 # CONCURRENT_REQUESTS_PER_IP = 1
 
@@ -48,11 +49,11 @@ DOWNLOAD_DELAY = 0
 #    "sc_bots.middlewares.ScBotsSpiderMiddleware": 543,
 # }
 
-# Enable or disable downloader middlewares
-# See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
+
 # DOWNLOADER_MIDDLEWARES = {
 #    "sc_bots.middlewares.ScBotsDownloaderMiddleware": 543,
 # }
+
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html

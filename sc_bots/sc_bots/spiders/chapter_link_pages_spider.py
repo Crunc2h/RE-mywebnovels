@@ -1,12 +1,13 @@
 import scrapy
-import random
 import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 import cout.native.console as cout
+
+from proxy_manager.models import modify_with_proxy
 from pathlib import Path
 from fake_useragent import UserAgent
 
-UA = UserAgent()
+
 FILE_FORMAT = "html"
 CHAPTER_LINK_PAGES_FORMAT = "/chapter_links_page-{current_page}.{file_format}"
 
@@ -14,7 +15,7 @@ CHAPTER_LINK_PAGES_FORMAT = "/chapter_links_page-{current_page}.{file_format}"
 class ChapterLinkPagesSpider(scrapy.Spider):
     name = "chapter_link_pages_spider"
     start_urls = []
-    custom_settings = {"USER_AGENT": UA.chrome}
+    user_agent_fetcher = UserAgent(browsers="firefox")
     download_delay = 0.5
 
     def __init__(
@@ -59,7 +60,14 @@ class ChapterLinkPagesSpider(scrapy.Spider):
     def start_requests(self):
         super().start_requests()
         for url in self.start_urls:
-            yield scrapy.Request(url, self.parse, dont_filter=True)
+            yield modify_with_proxy(
+                scrapy.Request(
+                    url,
+                    self.parse,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
+            )
 
     def parse(self, response):
         self.current_novel_page_url = response.url
@@ -78,9 +86,13 @@ class ChapterLinkPagesSpider(scrapy.Spider):
         )
         if chapters_index_page_url is None:
             raise Exception("No chapters index page!")
-        return response.follow(
-            chapters_index_page_url,
-            self.parse_chapter_link_page,
+        return modify_with_proxy(
+            scrapy.Request(
+                chapters_index_page_url,
+                self.parse_chapter_link_page,
+                dont_filter=True,
+                headers={"User-Agent": self.user_agent_fetcher.random},
+            )
         )
 
     def parse_chapter_link_page(self, response):
@@ -121,6 +133,11 @@ class ChapterLinkPagesSpider(scrapy.Spider):
             ##DEBUG
             raise Exception("Didnt scrape the whole content!!!")
         else:
-            return scrapy.Request(
-                next_page, self.parse_chapter_link_page, dont_filter=True
+            return modify_with_proxy(
+                scrapy.Request(
+                    next_page,
+                    self.parse_chapter_link_page,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
             )

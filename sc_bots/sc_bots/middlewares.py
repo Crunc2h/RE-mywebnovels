@@ -1,3 +1,8 @@
+import proxy_manager.models as pm_models
+from fake_useragent import UserAgent
+import random
+
+
 # Define here the models for your spider middleware
 #
 # See documentation in:
@@ -60,6 +65,7 @@ class ScBotsDownloaderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the downloader middleware does not modify the
     # passed objects.
+    UA = UserAgent()
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -71,13 +77,6 @@ class ScBotsDownloaderMiddleware:
     def process_request(self, request, spider):
         # Called for each request that goes through the downloader
         # middleware.
-
-        # Must either:
-        # - return None: continue processing this request
-        # - or return a Response object
-        # - or return a Request object
-        # - or raise IgnoreRequest: process_exception() methods of
-        #   installed downloader middleware will be called
         return None
 
     def process_response(self, request, response, spider):

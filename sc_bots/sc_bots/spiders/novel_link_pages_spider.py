@@ -3,6 +3,7 @@ import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 import cout.native.console as cout
 from pathlib import Path
+from proxy_manager.models import modify_with_proxy
 from fake_useragent import UserAgent
 
 UA = UserAgent()
@@ -13,7 +14,7 @@ NOVEL_LINKS_PAGE_FORMAT = "/novel_links_page-{current_page}.{file_format}"
 class NovelLinkPagesSpider(scrapy.Spider):
     name = "novel_link_pages_spider"
     start_urls = []
-    custom_settings = {"USER_AGENT": UA.chrome}
+    user_agent_fetcher = UserAgent(browsers="firefox")
     max_page = None
 
     def __init__(
@@ -43,10 +44,24 @@ class NovelLinkPagesSpider(scrapy.Spider):
         self.novel_link_pages_directory = novel_link_pages_directory
         self.get_next_page = get_next_page
         self.get_max_page = get_max_page
-        self.cout = cout.ConsoleOut(header="SC_BOTS::NOVEL_LINK_PAGES_SPIDER")
+
         self.start_urls.append(website_crawler_start_url)
         super().__init__(*args, **kwargs)
+
+        self.cout = cout.ConsoleOut(header="SC_BOTS::NOVEL_LINK_PAGES_SPIDER")
         self.cout.broadcast(style="success", message="Successfully initialized.")
+
+    def start_requests(self):
+        super().start_requests()
+        for url in self.start_urls:
+            yield modify_with_proxy(
+                scrapy.Request(
+                    url,
+                    self.parse,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
+            )
 
     def parse(self, response):
         self.cout.broadcast(
@@ -82,4 +97,11 @@ class NovelLinkPagesSpider(scrapy.Spider):
                 return
             raise Exception("Didnt scrape the whole content!!!")
         else:
-            return scrapy.Request(next_page, self.parse, dont_filter=True)
+            return modify_with_proxy(
+                scrapy.Request(
+                    next_page,
+                    self.parse,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
+            )

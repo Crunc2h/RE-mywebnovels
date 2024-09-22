@@ -1,12 +1,12 @@
 import scrapy
-import random
 import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 import cout.native.console as cout
 from pathlib import Path
+from proxy_manager.models import modify_with_proxy
 from fake_useragent import UserAgent
 
-UA = UserAgent()
+
 FILE_FORMAT = "html"
 CHAPTER_PAGES_FORMAT = "/chapter-{current_chapter}.{file_format}"
 
@@ -14,7 +14,7 @@ CHAPTER_PAGES_FORMAT = "/chapter-{current_chapter}.{file_format}"
 class ChapterPagesSpider(scrapy.Spider):
     name = "chapter_pages_spider"
     start_urls = []
-    custom_settings = {"USER_AGENT": UA.chrome}
+    user_agent_fetcher = UserAgent(browsers="firefox")
     chapter_page_numbers_used = []
     download_delay = 0.5
 
@@ -48,7 +48,14 @@ class ChapterPagesSpider(scrapy.Spider):
     def start_requests(self):
         super().start_requests()
         for url in self.start_urls:
-            yield scrapy.Request(url, self.parse, dont_filter=True)
+            yield modify_with_proxy(
+                scrapy.Request(
+                    url,
+                    self.parse,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
+            )
 
     def parse(self, response):
         current_chapter_pages_directory = self.chapter_urls_to_chapter_page_directories[
