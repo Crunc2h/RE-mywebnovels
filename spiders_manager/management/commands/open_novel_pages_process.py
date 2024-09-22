@@ -110,7 +110,7 @@ class Command(BaseCommand):
                 novel
                 for novel, novel_object_dict in matching_novels_and_novel_object_dicts
             ],
-            ["author", "completion_status", "summary"],
+            ["author", "completion_status", "summary", "initialized"],
         )
 
         update_process_instance.old_novels_updated = old_novels_updated

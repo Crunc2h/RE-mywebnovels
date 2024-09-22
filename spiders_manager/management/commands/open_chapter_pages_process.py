@@ -90,5 +90,6 @@ class Command(BaseCommand):
         )
         ns_models.Chapter.objects.bulk_create(new_chapters)
 
+        update_process_instance.chapters_added = len(new_chapters)
         update_process_instance.process_phase = sm_models.ProcessPhases.FINISHED
         update_process_instance.save()

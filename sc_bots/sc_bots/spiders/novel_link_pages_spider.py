@@ -14,7 +14,6 @@ class NovelLinkPagesSpider(scrapy.Spider):
     name = "novel_link_pages_spider"
     start_urls = []
     custom_settings = {"USER_AGENT": UA.chrome}
-    download_delay = 0.5
     max_page = None
 
     def __init__(

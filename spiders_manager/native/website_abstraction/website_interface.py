@@ -105,9 +105,11 @@ class WebsiteInterface:
                             soup, novel_link_object.website_link_object.base_link
                         )
                     )
+
                     new_chapter_link_object_dicts.extend(
                         chapter_link_object_dicts_in_page
                     )
+
                     if bad_content_in_page:
                         bad_pages.append(file_path)
             matching_novel_and_chapter_link_object_dicts.append(

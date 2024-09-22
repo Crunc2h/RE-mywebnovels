@@ -203,17 +203,18 @@ def dbwide_get_novel_of_name(novel_name):
 
 
 def bulk_dbwide_get_novels_of_name_by_nldicts(new_novel_link_object_dicts):
-    all = Novel.objects.all()
-    novel_names = [novel.name for novel in all]
+
+    novels = {novel.name: novel for novel in Novel.objects.all()}
     existing_links = []
     new_links = []
     for novel_link_object_dict in new_novel_link_object_dicts:
-        if novel_link_object_dict["name"] in novel_names:
+        if novels.get(novel_link_object_dict["name"]) != None:
             existing_links.append(novel_link_object_dict)
         else:
             new_links.append(novel_link_object_dict)
+
     matching_novels_and_dicts = [
-        (all.get(name=novel_link_object_dict["name"]), novel_link_object_dict)
+        (novels.get(name=novel_link_object_dict["name"]), novel_link_object_dict)
         for novel_link_object_dict in existing_links
     ]
     return matching_novels_and_dicts, new_links
@@ -226,10 +227,10 @@ def bulk_dbwide_filter_chapters_of_name_by_cldicts(
         map(
             lambda matching_nl_obj_and_clo_dicts: (
                 matching_nl_obj_and_clo_dicts[0],
-                [
-                    chapter.name
+                {
+                    chapter.name: True
                     for chapter in matching_nl_obj_and_clo_dicts[0].novel.chapters.all()
-                ],
+                },
                 matching_nl_obj_and_clo_dicts[1],
             ),
             matching_novel_and_chapter_link_object_dicts,
@@ -242,7 +243,8 @@ def bulk_dbwide_filter_chapters_of_name_by_cldicts(
                 converted[0],
                 list(
                     filter(
-                        lambda cl_obj_dict: cl_obj_dict["name"] not in converted[1],
+                        lambda cl_obj_dict: converted[1].get(cl_obj_dict["name"])
+                        is None,
                         converted[2],
                     )
                 ),

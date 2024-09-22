@@ -19,27 +19,28 @@ class WebsiteLink(models.Model):
         ]
 
     def bulk_get_absent_novel_links(self, new_novel_link_object_dicts):
-        present_links = [
-            novel_link_object.link
+        present_links = {
+            novel_link_object.link: True
             for novel_link_object in self.novel_link_objects.all()
-        ]
+        }
+
         absent_link_object_dicts = []
         for novel_link_object_dict in new_novel_link_object_dicts:
-            if novel_link_object_dict["link"] not in present_links:
+            if present_links.get(novel_link_object_dict["link"]) is None:
                 absent_link_object_dicts.append(novel_link_object_dict)
         return absent_link_object_dicts
 
     def bulk_get_absent_chapter_links(
         self, matching_novel_and_chapter_link_object_dicts
     ):
-        present_links = []
+        present_links = {}
         for novel_link_object in self.novel_link_objects.all():
-            present_links.extend(
-                [
-                    chapter_link_object.link
-                    for chapter_link_object in novel_link_object.chapter_link_objects.all()
-                ]
-            )
+            links = [
+                chapter_link_object.link
+                for chapter_link_object in novel_link_object.chapter_link_objects.all()
+            ]
+            for link in links:
+                present_links[link] = True
 
         absent_matching_novel_and_chapter_link_object_dicts = []
         for (
@@ -48,8 +49,10 @@ class WebsiteLink(models.Model):
         ) in matching_novel_and_chapter_link_object_dicts:
             absent_links_of_novel_object = list(
                 filter(
-                    lambda chapter_link_object_dict: chapter_link_object_dict["link"]
-                    not in present_links,
+                    lambda chapter_link_object_dict: present_links.get(
+                        chapter_link_object_dict["link"]
+                    )
+                    == None,
                     chapter_link_object_dicts,
                 )
             )
