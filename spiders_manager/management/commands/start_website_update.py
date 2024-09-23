@@ -52,6 +52,7 @@ class Command(BaseCommand):
             process_id=0, website_update_instance=website_update_instance
         )
         new_update_process_instance.save()
+
         novel_link_pages_process = subprocess.run(
             f"python3 manage.py open_novel_link_pages_process 0 '{website.name}'",
             shell=True,

@@ -4,7 +4,9 @@ import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 from typing import Iterable
 from pathlib import Path
-from proxy_manager.models import modify_with_proxy
+from proxy_manager.models import modify_with_proxy, proxy_exists
+from twisted.internet.error import TimeoutError
+from scrapy.spidermiddlewares.httperror import HttpError
 from fake_useragent import UserAgent
 
 
@@ -23,11 +25,13 @@ class NovelPagesSpider(scrapy.Spider):
         process_id,
         website_name,
         novel_page_urls_to_novel_directories,
+        use_proxy=False,
         *args,
         **kwargs,
     ):
         self.process_id = process_id
         self.website_name = website_name
+        self.use_proxy = use_proxy
 
         self.update_process_instance = ns_models.Website.objects.get(
             name=self.website_name
@@ -48,14 +52,22 @@ class NovelPagesSpider(scrapy.Spider):
     def start_requests(self) -> Iterable[scrapy.Request]:
         super().start_requests()
         for url in self.start_urls:
-            yield modify_with_proxy(
-                scrapy.Request(
+            if self.use_proxy:
+                request = scrapy.Request(
                     url,
                     self.parse,
                     dont_filter=True,
                     headers={"User-Agent": self.user_agent_fetcher.random},
                 )
-            )
+                modified = modify_with_proxy(request)
+                yield modified
+            else:
+                yield scrapy.Request(
+                    url,
+                    self.parse,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
 
     def parse(self, response):
         current_novel_directory = self.novel_page_urls_to_novel_directories[
@@ -71,3 +83,16 @@ class NovelPagesSpider(scrapy.Spider):
 
         self.spider_instance.novel_pages_scraped += 1
         self.spider_instance.save()
+
+    def errback(self, failure):
+        self.logger.error(repr(failure))
+        if failure.check(TimeoutError) or failure.check(HttpError):
+            proxy = failure.request.meta.get("proxy")
+            if proxy_exists(proxy) and not self.use_proxy:
+                return scrapy.Request(
+                    failure.request.url,
+                    callback=self.parse,
+                    errback=self.errback,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )

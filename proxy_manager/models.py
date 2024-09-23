@@ -22,3 +22,7 @@ def modify_with_proxy(request):
         return request
     request.meta["proxy"] = proxy
     return request
+
+
+def proxy_exists(proxy_schema):
+    return proxy_schema in [proxy.schema for proxy in Proxy.objects.all()]

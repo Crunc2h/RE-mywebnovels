@@ -3,7 +3,9 @@ import spiders_manager.models as sm_models
 import novels_storage.models as ns_models
 import cout.native.console as cout
 from pathlib import Path
-from proxy_manager.models import modify_with_proxy
+from proxy_manager.models import modify_with_proxy, proxy_exists
+from twisted.internet.error import TimeoutError
+from scrapy.spidermiddlewares.httperror import HttpError
 from fake_useragent import UserAgent
 
 UA = UserAgent()
@@ -25,6 +27,7 @@ class NovelLinkPagesSpider(scrapy.Spider):
         website_crawler_start_url,
         get_next_page,
         get_max_page,
+        use_proxy=False,
         *args,
         **kwargs,
     ):
@@ -36,6 +39,7 @@ class NovelLinkPagesSpider(scrapy.Spider):
                 process_id=self.process_id
             )
         )
+        self.use_proxy = use_proxy
         self.spider_instance = sm_models.UpdateSpiderInstance(
             update_process_instance=self.update_process_instance
         )
@@ -54,14 +58,22 @@ class NovelLinkPagesSpider(scrapy.Spider):
     def start_requests(self):
         super().start_requests()
         for url in self.start_urls:
-            yield modify_with_proxy(
-                scrapy.Request(
+            if self.use_proxy:
+                request = scrapy.Request(
                     url,
                     self.parse,
                     dont_filter=True,
                     headers={"User-Agent": self.user_agent_fetcher.random},
                 )
-            )
+                modified = modify_with_proxy(request)
+                yield modified
+            else:
+                yield scrapy.Request(
+                    url,
+                    self.parse,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )
 
     def parse(self, response):
         self.cout.broadcast(
@@ -97,11 +109,34 @@ class NovelLinkPagesSpider(scrapy.Spider):
                 return
             raise Exception("Didnt scrape the whole content!!!")
         else:
-            return modify_with_proxy(
-                scrapy.Request(
+            if not self.use_proxy:
+                return scrapy.Request(
                     next_page,
                     self.parse,
+                    errback=self.errback,
                     dont_filter=True,
                     headers={"User-Agent": self.user_agent_fetcher.random},
                 )
-            )
+            else:
+                return modify_with_proxy(
+                    scrapy.Request(
+                        next_page,
+                        self.parse,
+                        errback=self.errback,
+                        dont_filter=True,
+                        headers={"User-Agent": self.user_agent_fetcher.random},
+                    )
+                )
+
+    def errback(self, failure):
+        self.logger.error(repr(failure))
+        if failure.check(TimeoutError) or failure.check(HttpError):
+            proxy = failure.request.meta.get("proxy")
+            if proxy_exists(proxy) and not self.use_proxy:
+                return scrapy.Request(
+                    failure.request.url,
+                    self.parse,
+                    errback=self.errback,
+                    dont_filter=True,
+                    headers={"User-Agent": self.user_agent_fetcher.random},
+                )

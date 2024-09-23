@@ -83,7 +83,7 @@ class ConsoleOut:
 
         t_delta = (datetime.now(timezone.utc) - t_update_start).seconds
         body += f"{ConsoleColors.CBOLD}{ConsoleColors.CRED}{t_delta}{ConsoleColors.CEND}s elapsed\n"
-        body += f"Available proxies: {pm_models.Proxy.objects.count()}"
+        body += f"Available proxies: {pm_models.Proxy.objects.count()}\n"
 
         for header in process_headers:
             body += f"{ConsoleColors.CBOLD}{ConsoleColors.CGREEN}PROCESS 0{header[0]}{ConsoleColors.CEND} - {ConsoleColors.CBOLD}{ConsoleColors.CVIOLET}{header[1]}{ConsoleColors.CEND}\n"
